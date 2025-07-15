@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Malaysia Administrative Boundary Finder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Turf.js -->
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+  <style>
+    #map { height: 600px; }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+  <div class="container mx-auto p-4 max-w-5xl">
+    <h1 class="text-2xl font-bold mb-4 text-center">Malaysia Administrative Boundary Finder</h1>
+    <div class="flex flex-col md:flex-row gap-4 mb-4">
+      <input id="searchInput" type="text" placeholder="e.g. 1.5581, 103.6386 or Kulai" class="flex-grow p-3 border rounded-lg" />
+      <button id="searchBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">Search</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white p-4 rounded shadow space-y-2" id="resultsPanel">
+        <p class="text-gray-500">Search result will appear here.</p>
+      </div>
+      <div class="md:col-span-2">
+        <div id="map" class="rounded shadow"></div>
+      </div>
+    </div>
+
+    <footer class="text-center text-sm text-gray-500 mt-8">
+      <p>Powered by <a href="https://openstreetmap.org" target="_blank" class="text-blue-600 hover:underline">OpenStreetMap</a>, <a href="https://github.com/dosm-malaysia/data-open" target="_blank" class="text-blue-600 hover:underline">DOSM GeoData</a>, <a href="https://leafletjs.com/" target="_blank" class="text-blue-600 hover:underline">Leaflet</a>, and <a href="https://turfjs.org/" target="_blank" class="text-blue-600 hover:underline">Turf.js</a>. - coded by pisczcek -</p>
+    </footer>
+  </div>
+
+  <script>
+    const map = L.map('map').setView([4.2105, 108.9758], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let userMarker;
+    let activeLayers = [];
+    let labelMarkers = [];
+
+    const files = {
+      district: 'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/administrative_2_district.geojson',
+      parliament: 'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_0_parlimen.geojson',
+      dun: 'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_1_dun.geojson'
+    };
+
+    const geoData = {};
+
+    async function loadGeoJSONs() {
+      for (const [key, url] of Object.entries(files)) {
+        const res = await fetch(url);
+        geoData[key] = await res.json();
+      }
+    }
+
+    loadGeoJSONs().then(() => {
+      document.getElementById('searchBtn').addEventListener('click', handleSearch);
+      document.getElementById('searchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSearch();
+      });
+    });
+
+    async function handleSearch() {
+      const query = document.getElementById('searchInput').value.trim();
+      if (!query) return;
+
+      let lat, lon, label;
+
+      if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(query)) {
+        [lat, lon] = query.split(',').map(Number);
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+        const data = await res.json();
+        label = data.display_name || `Coordinates: ${lat}, ${lon}`;
+      } else {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=my&limit=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.length) return alert("Location not found.");
+        lat = parseFloat(data[0].lat);
+        lon = parseFloat(data[0].lon);
+        label = data[0].display_name;
+      }
+
+      const point = turf.point([lon, lat]);
+      const results = {};
+
+      activeLayers.forEach(l => map.removeLayer(l));
+      labelMarkers.forEach(m => map.removeLayer(m));
+      activeLayers = [];
+      labelMarkers = [];
+
+      const fieldMap = {
+        district: 'district',
+        parliament: 'parlimen',
+        dun: 'dun'
+      };
+
+      for (const [key, data] of Object.entries(geoData)) {
+        const match = data.features.find(f => turf.booleanPointInPolygon(point, f));
+        if (match) {
+          const field = fieldMap[key];
+          const name = match.properties?.[field] || 'Not found';
+          results[key] = name;
+
+          const boundaryLayer = L.geoJSON(match, {
+            style: {
+              color: key === 'district' ? '#ff7800' : key === 'parliament' ? '#007bff' : '#28a745',
+              weight: 3,
+              fillOpacity: 0.1
+            }
+          }).addTo(map);
+          activeLayers.push(boundaryLayer);
+
+          const center = turf.centerOfMass(match).geometry.coordinates;
+          const labelMarker = L.marker([center[1], center[0]], {
+            icon: L.divIcon({
+              className: 'text-sm font-semibold text-black bg-white px-2 py-1 rounded shadow',
+              html: `${key.charAt(0).toUpperCase() + key.slice(1)}: ${name}`
+            })
+          }).addTo(map);
+          labelMarkers.push(labelMarker);
+        } else {
+          results[key] = 'Not found';
+        }
+      }
+
+      if (userMarker) userMarker.remove();
+      userMarker = L.marker([lat, lon]).addTo(map).bindPopup(`
+        <strong>${label}</strong><br>
+        <b>District:</b> ${results.district}<br>
+        <b>Parliament:</b> ${results.parliament}<br>
+        <b>DUN:</b> ${results.dun}
+      `).openPopup();
+      map.setView([lat, lon], 12);
+
+      const panel = document.getElementById('resultsPanel');
+      panel.innerHTML = `
+        <div>
+          <p class="text-sm text-gray-500">Search Location:</p>
+          <p class="text-lg font-semibold text-blue-700">${label}</p>
+        </div>
+        <div class="mt-3 border-t pt-3 space-y-2">
+          <p><b>District:</b> ${results.district}</p>
+          <p><b>Parliament:</b> ${results.parliament}</p>
+          <p><b>DUN:</b> ${results.dun}</p>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
