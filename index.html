@@ -5,21 +5,74 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Malaysia Administrative Boundary Finder</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Turf.js -->
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
-
   <style>
     #map { height: 600px; }
+
+    #context-menu {
+      position: fixed;
+      z-index: 9999;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      padding: 4px 0;
+      min-width: 220px;
+      display: none;
+      font-family: sans-serif;
+    }
+    #context-menu .menu-item {
+      padding: 9px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #1f2937;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #context-menu .menu-item:hover { background: #f3f4f6; }
+    #context-menu .menu-coords {
+      padding: 7px 16px 5px;
+      font-size: 11px;
+      color: #6b7280;
+      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 2px;
+      font-family: monospace;
+    }
+
+    .result-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-weight: 500;
+    }
+    .badge-district { background: #fff3e0; color: #e65100; }
+    .badge-parliament { background: #e3f2fd; color: #1565c0; }
+    .badge-dun { background: #e8f5e9; color: #2e7d32; }
+    .crosshair-cursor { cursor: crosshair; }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans">
+
+  <div id="context-menu">
+    <div id="ctx-coords" class="menu-coords"></div>
+    <div class="menu-item" id="ctx-find">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Find district / parliament / DUN
+    </div>
+    <div class="menu-item" id="ctx-copy">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy coordinates
+    </div>
+  </div>
+
   <div class="container mx-auto p-4 max-w-5xl">
-    <h1 class="text-2xl font-bold mb-4 text-center">Malaysia Administrative Boundary Finder</h1>
+    <h1 class="text-2xl font-bold mb-1 text-center">Malaysia Administrative Boundary Finder</h1>
+    <p class="text-center text-sm text-gray-500 mb-4">Search by address or coordinates — or <strong>right-click</strong> anywhere on the map</p>
+
     <div class="flex flex-col md:flex-row gap-4 mb-4">
       <input id="searchInput" type="text" placeholder="e.g. 1.5581, 103.6386 or Kulai" class="flex-grow p-3 border rounded-lg" />
       <button id="searchBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">Search</button>
@@ -27,7 +80,9 @@
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="bg-white p-4 rounded shadow space-y-2" id="resultsPanel">
-        <p class="text-gray-500">Search result will appear here.</p>
+        <p class="text-gray-400 text-sm">Search result will appear here.<br><br>
+          <span class="text-xs text-gray-400">Tip: Right-click on the map to instantly find a location's boundaries.</span>
+        </p>
       </div>
       <div class="md:col-span-2">
         <div id="map" class="rounded shadow"></div>
@@ -35,7 +90,7 @@
     </div>
 
     <footer class="text-center text-sm text-gray-500 mt-8">
-      <p>Powered by <a href="https://openstreetmap.org" target="_blank" class="text-blue-600 hover:underline">OpenStreetMap</a>, <a href="https://github.com/dosm-malaysia/data-open" target="_blank" class="text-blue-600 hover:underline">DOSM GeoData</a>, <a href="https://leafletjs.com/" target="_blank" class="text-blue-600 hover:underline">Leaflet</a>, and <a href="https://turfjs.org/" target="_blank" class="text-blue-600 hover:underline">Turf.js</a>. - coded by pisczcek -</p>
+      <p>Powered by <a href="https://openstreetmap.org" target="_blank" class="text-blue-600 hover:underline">OpenStreetMap</a>, <a href="https://github.com/dosm-malaysia/data-open" target="_blank" class="text-blue-600 hover:underline">DOSM GeoData</a>, <a href="https://leafletjs.com/" target="_blank" class="text-blue-600 hover:underline">Leaflet</a>, <a href="https://turfjs.org/" target="_blank" class="text-blue-600 hover:underline">Turf.js</a> &amp; Anthropic Claude. - coded by pisczcek -</p>
     </footer>
   </div>
 
@@ -50,12 +105,13 @@
     let labelMarkers = [];
 
     const files = {
-      district: 'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/administrative_2_district.geojson',
+      district:   'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/administrative_2_district.geojson',
       parliament: 'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_0_parlimen.geojson',
-      dun: 'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_1_dun.geojson'
+      dun:        'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_1_dun.geojson'
     };
 
     const geoData = {};
+    let contextLatLng = null;
 
     async function loadGeoJSONs() {
       for (const [key, url] of Object.entries(files)) {
@@ -66,18 +122,52 @@
 
     loadGeoJSONs().then(() => {
       document.getElementById('searchBtn').addEventListener('click', handleSearch);
-      document.getElementById('searchInput').addEventListener('keypress', (e) => {
+      document.getElementById('searchInput').addEventListener('keypress', e => {
         if (e.key === 'Enter') handleSearch();
       });
     });
 
+    // ── Right-click context menu ─────────────────────────────────────────────
+    const ctxMenu = document.getElementById('context-menu');
+    const ctxCoords = document.getElementById('ctx-coords');
+
+    map.on('contextmenu', (e) => {
+      e.originalEvent.preventDefault();
+      contextLatLng = e.latlng;
+
+      ctxCoords.textContent = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+
+      const x = e.originalEvent.clientX;
+      const y = e.originalEvent.clientY;
+      ctxMenu.style.left = Math.min(x, window.innerWidth  - 240) + 'px';
+      ctxMenu.style.top  = Math.min(y, window.innerHeight - 120) + 'px';
+      ctxMenu.style.display = 'block';
+    });
+
+    document.addEventListener('click', () => ctxMenu.style.display = 'none');
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') ctxMenu.style.display = 'none'; });
+
+    document.getElementById('ctx-find').addEventListener('click', () => {
+      if (!contextLatLng) return;
+      ctxMenu.style.display = 'none';
+      runLookup(contextLatLng.lat, contextLatLng.lng, null);
+    });
+
+    document.getElementById('ctx-copy').addEventListener('click', () => {
+      if (!contextLatLng) return;
+      ctxMenu.style.display = 'none';
+      const text = `${contextLatLng.lat.toFixed(6)}, ${contextLatLng.lng.toFixed(6)}`;
+      navigator.clipboard.writeText(text).catch(() => {});
+    });
+
+    // ── Main search ──────────────────────────────────────────────────────────
     async function handleSearch() {
       const query = document.getElementById('searchInput').value.trim();
       if (!query) return;
 
       let lat, lon, label;
 
-      if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(query)) {
+      if (/^-?\d+\.?\d*,\s*-?\d+\.?\d*$/.test(query)) {
         [lat, lon] = query.split(',').map(Number);
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
         const data = await res.json();
@@ -92,71 +182,82 @@
         label = data[0].display_name;
       }
 
+      runLookup(lat, lon, label);
+    }
+
+    // ── Core lookup ──────────────────────────────────────────────────────────
+    async function runLookup(lat, lon, label) {
       const point = turf.point([lon, lat]);
-      const results = {};
 
       activeLayers.forEach(l => map.removeLayer(l));
       labelMarkers.forEach(m => map.removeLayer(m));
       activeLayers = [];
       labelMarkers = [];
 
-      const fieldMap = {
-        district: 'district',
-        parliament: 'parlimen',
-        dun: 'dun'
-      };
+      if (!label) {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+          const data = await res.json();
+          label = data.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+        } catch {
+          label = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+        }
+      }
+
+      const fieldMap = { district: 'district', parliament: 'parlimen', dun: 'dun' };
+      const colors   = { district: '#ff7800', parliament: '#007bff', dun: '#28a745' };
+      const results  = {};
 
       for (const [key, data] of Object.entries(geoData)) {
         const match = data.features.find(f => turf.booleanPointInPolygon(point, f));
         if (match) {
           const field = fieldMap[key];
-          const name = match.properties?.[field] || 'Not found';
-          results[key] = name;
+          results[key] = match.properties?.[field] || 'Not found';
 
-          const boundaryLayer = L.geoJSON(match, {
-            style: {
-              color: key === 'district' ? '#ff7800' : key === 'parliament' ? '#007bff' : '#28a745',
-              weight: 3,
-              fillOpacity: 0.1
-            }
+          const layer = L.geoJSON(match, {
+            style: { color: colors[key], weight: 3, fillOpacity: 0.1 }
           }).addTo(map);
-          activeLayers.push(boundaryLayer);
+          activeLayers.push(layer);
 
           const center = turf.centerOfMass(match).geometry.coordinates;
-          const labelMarker = L.marker([center[1], center[0]], {
+          const lm = L.marker([center[1], center[0]], {
             icon: L.divIcon({
               className: 'text-sm font-semibold text-black bg-white px-2 py-1 rounded shadow',
-              html: `${key.charAt(0).toUpperCase() + key.slice(1)}: ${name}`
+              html: `<span style="font-size:12px;background:white;border:1px solid #ccc;padding:2px 7px;border-radius:4px;white-space:nowrap">${key.charAt(0).toUpperCase()+key.slice(1)}: ${results[key]}</span>`
             })
           }).addTo(map);
-          labelMarkers.push(labelMarker);
+          labelMarkers.push(lm);
         } else {
           results[key] = 'Not found';
         }
       }
 
       if (userMarker) userMarker.remove();
-      userMarker = L.marker([lat, lon]).addTo(map).bindPopup(`
-        <strong>${label}</strong><br>
-        <b>District:</b> ${results.district}<br>
-        <b>Parliament:</b> ${results.parliament}<br>
-        <b>DUN:</b> ${results.dun}
-      `).openPopup();
+      userMarker = L.marker([lat, lon]).addTo(map)
+        .bindPopup(`
+          <strong style="font-size:13px">${label}</strong><br>
+          <b>District:</b> ${results.district}<br>
+          <b>Parliament:</b> ${results.parliament}<br>
+          <b>DUN:</b> ${results.dun}
+        `).openPopup();
       map.setView([lat, lon], 12);
 
+      // Show results panel immediately, with ADUN loading
       const panel = document.getElementById('resultsPanel');
       panel.innerHTML = `
         <div>
-          <p class="text-sm text-gray-500">Search Location:</p>
-          <p class="text-lg font-semibold text-blue-700">${label}</p>
+          <p class="text-xs text-gray-400 mb-1">Location</p>
+          <p class="text-sm font-medium text-blue-700 leading-snug">${label}</p>
+          <p class="text-xs text-gray-400 mt-1">${lat.toFixed(6)}, ${lon.toFixed(6)}</p>
         </div>
-        <div class="mt-3 border-t pt-3 space-y-2">
-          <p><b>District:</b> ${results.district}</p>
-          <p><b>Parliament:</b> ${results.parliament}</p>
-          <p><b>DUN:</b> ${results.dun}</p>
+        <div class="border-t pt-3 space-y-2 mt-2">
+          <p class="text-sm"><span class="result-badge badge-district">District</span> <span class="font-medium">${results.district}</span></p>
+          <p class="text-sm"><span class="result-badge badge-parliament">Parliament</span> <span class="font-medium">${results.parliament}</span></p>
+          <p class="text-sm"><span class="result-badge badge-dun">DUN</span> <span class="font-medium">${results.dun}</span></p>
         </div>
       `;
     }
+
   </script>
 </body>
 </html>
