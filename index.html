@@ -299,7 +299,7 @@ function boot() {
     osm:  { url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',              attr:'&copy; OpenStreetMap contributors' },
     topo: { url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                attr:'&copy; OSM &copy; OpenTopoMap' }
   };
-  var tileKeys = ['dark','osm','topo'];
+  var tileKeys = ['osm','topo'];
   var tileIdx  = 0;
   var tileLayers = {};
   Object.keys(TILES).forEach(function(k) {
