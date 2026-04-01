@@ -3,261 +3,631 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Malaysia Administrative Boundary Finder</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Malaysia Boundary Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
   <style>
-    #map { height: 600px; }
-
-    #context-menu {
-      position: fixed;
-      z-index: 9999;
-      background: white;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      padding: 4px 0;
-      min-width: 220px;
-      display: none;
-      font-family: sans-serif;
+    :root {
+      --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+      --text:#e6edf3;--muted:#7d8590;--accent:#14b8a6;
+      --district:#f97316;--parliament:#38bdf8;--dun:#4ade80;--danger:#f87171;--r:10px;
     }
-    #context-menu .menu-item {
-      padding: 9px 16px;
-      cursor: pointer;
-      font-size: 14px;
-      color: #1f2937;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #context-menu .menu-item:hover { background: #f3f4f6; }
-    #context-menu .menu-coords {
-      padding: 7px 16px 5px;
-      font-size: 11px;
-      color: #6b7280;
-      border-bottom: 1px solid #e5e7eb;
-      margin-bottom: 2px;
-      font-family: monospace;
-    }
-
-    .result-badge {
-      display: inline-block;
-      font-size: 11px;
-      padding: 1px 7px;
-      border-radius: 99px;
-      font-weight: 500;
-    }
-    .badge-district { background: #fff3e0; color: #e65100; }
-    .badge-parliament { background: #e3f2fd; color: #1565c0; }
-    .badge-dun { background: #e8f5e9; color: #2e7d32; }
-    .crosshair-cursor { cursor: crosshair; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;overflow-x:hidden}
+    body::before{content:'';position:fixed;inset:0;
+      background-image:linear-gradient(rgba(20,184,166,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(20,184,166,.04) 1px,transparent 1px);
+      background-size:40px 40px;pointer-events:none;z-index:0}
+    .app-wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:24px 20px;display:flex;flex-direction:column;gap:20px}
+    header{display:flex;flex-direction:column;align-items:center;gap:6px}
+    .header-badge{font-family:'Syne',sans-serif;font-size:11px;letter-spacing:.15em;text-transform:uppercase;
+      color:var(--accent);background:rgba(20,184,166,.12);border:1px solid rgba(20,184,166,.25);padding:3px 12px;border-radius:99px}
+    h1{font-family:'Syne',sans-serif;font-size:clamp(1.6rem,4vw,2.4rem);font-weight:800;letter-spacing:-.02em;
+      background:linear-gradient(135deg,#e6edf3 30%,var(--accent) 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-align:center;line-height:1.2}
+    header p{color:var(--muted);font-size:13px;text-align:center}
+    header p strong{color:var(--accent);font-weight:500}
+    .search-row{display:flex;gap:10px;align-items:stretch}
+    .search-wrap{flex:1;position:relative}
+    .search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+    #searchInput{width:100%;height:48px;padding:0 14px 0 42px;background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--r);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;
+      transition:border-color .2s,box-shadow .2s}
+    #searchInput::placeholder{color:var(--muted)}
+    #searchInput:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(20,184,166,.15)}
+    .btn{height:48px;padding:0 20px;border-radius:var(--r);border:none;font-family:'Syne',sans-serif;
+      font-size:13px;font-weight:600;letter-spacing:.04em;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s}
+    .btn-primary{background:var(--accent);color:#0d1117}
+    .btn-primary:hover{background:#0fd3be;transform:translateY(-1px)}
+    .btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+    .btn-ghost:hover{background:var(--surface2);border-color:var(--accent);color:var(--accent)}
+    .btn-icon{width:48px;height:48px;padding:0;justify-content:center;background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:var(--r)}
+    .btn-icon:hover{background:var(--surface2);color:var(--accent);border-color:var(--accent)}
+    .toggles-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .toggles-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'Syne',sans-serif;margin-right:4px}
+    .layer-toggle{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:99px;
+      border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:12px;font-weight:500;color:var(--muted);transition:all .15s;user-select:none}
+    .layer-toggle .dot{width:8px;height:8px;border-radius:50%;opacity:.4;transition:opacity .15s}
+    .layer-toggle.active{border-color:currentColor}
+    .layer-toggle.active .dot{opacity:1}
+    .layer-toggle[data-layer="district"]{color:var(--district)}
+    .layer-toggle[data-layer="parliament"]{color:var(--parliament)}
+    .layer-toggle[data-layer="dun"]{color:var(--dun)}
+    .layer-toggle[data-layer="district"].active{background:rgba(249,115,22,.1)}
+    .layer-toggle[data-layer="parliament"].active{background:rgba(56,189,248,.1)}
+    .layer-toggle[data-layer="dun"].active{background:rgba(74,222,128,.1)}
+    .main-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
+    @media(max-width:768px){.main-grid{grid-template-columns:1fr}.sidebar{order:2}.map-wrap{order:1}}
+    .sidebar{display:flex;flex-direction:column;gap:12px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+    .card-header{padding:12px 16px;border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;
+      font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+      display:flex;align-items:center;justify-content:space-between}
+    .card-header .btn{height:24px;padding:0 8px;font-size:11px}
+    .card-body{padding:16px}
+    .result-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:12px;padding:24px 16px;color:var(--muted);text-align:center}
+    .result-placeholder svg{opacity:.3}
+    .result-placeholder p{font-size:13px;line-height:1.6}
+    .result-location{font-size:12.5px;color:var(--text);font-weight:400;line-height:1.5;margin-bottom:4px}
+    .result-coords{font-size:11px;font-family:monospace;color:var(--muted);margin-bottom:16px}
+    .result-items{display:flex;flex-direction:column;gap:10px}
+    .result-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+      background:var(--surface2);position:relative;transition:background .15s}
+    .result-item:hover{background:rgba(255,255,255,.05)}
+    .result-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .result-label{font-size:10px;font-family:'Syne',sans-serif;letter-spacing:.1em;text-transform:uppercase;
+      color:var(--muted);display:block;margin-bottom:1px}
+    .result-value{font-size:14px;font-weight:500;color:var(--text)}
+    .copy-btn{margin-left:auto;opacity:0;background:none;border:none;color:var(--muted);cursor:pointer;
+      padding:4px;border-radius:4px;transition:all .15s;display:flex;align-items:center}
+    .result-item:hover .copy-btn{opacity:1}
+    .copy-btn:hover{color:var(--accent);background:rgba(20,184,166,.1)}
+    .result-actions{display:flex;gap:8px;margin-top:14px}
+    .result-actions .btn{height:36px;font-size:12px;flex:1;padding:0 12px}
+    .not-found-badge{font-size:11px;color:var(--danger);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);padding:2px 8px;border-radius:99px}
+    .history-list{display:flex;flex-direction:column;gap:4px}
+    .history-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;transition:background .15s}
+    .history-item:hover{background:var(--surface2)}
+    .history-icon{width:28px;height:28px;border-radius:6px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted)}
+    .history-name{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+    .history-sub{font-size:10px;color:var(--muted)}
+    .history-empty{color:var(--muted);font-size:12px;padding:12px 4px;text-align:center}
+    .map-wrap{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}
+    #map{height:580px;background:#0d1117}
+    .map-overlay-btns{position:absolute;top:12px;right:12px;z-index:500;display:flex;flex-direction:column;gap:6px}
+    .map-btn{width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+      display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:all .15s}
+    .map-btn:hover{background:var(--surface2);color:var(--accent);border-color:var(--accent)}
+    .map-status{position:absolute;bottom:12px;left:12px;z-index:500;background:rgba(13,17,23,.85);
+      border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:11px;color:var(--muted);
+      backdrop-filter:blur(6px);display:flex;align-items:center;gap:6px;
+      max-width:calc(100% - 70px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .status-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:blink 2s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    #loadingOverlay{position:absolute;inset:0;z-index:600;background:rgba(13,17,23,.88);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+      border-radius:var(--r);transition:opacity .3s}
+    #loadingOverlay.hidden{opacity:0;pointer-events:none}
+    .spinner{width:36px;height:36px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-text{font-size:13px;color:var(--muted);font-family:'Syne',sans-serif;letter-spacing:.06em}
+    #context-menu{position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--r);box-shadow:0 8px 32px rgba(0,0,0,.5);padding:6px;min-width:220px;display:none;
+      animation:menuIn .1s ease}
+    @keyframes menuIn{from{opacity:0;transform:scale(.97) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
+    .ctx-coords{padding:7px 10px 9px;font-size:11px;color:var(--muted);font-family:monospace;border-bottom:1px solid var(--border);margin-bottom:4px}
+    .ctx-item{padding:9px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);display:flex;align-items:center;gap:9px;transition:background .1s}
+    .ctx-item:hover{background:var(--surface2)}
+    .ctx-item svg{color:var(--muted);flex-shrink:0}
+    #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);
+      background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;
+      border-radius:99px;font-size:13px;font-weight:500;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+      z-index:99999;white-space:nowrap;display:flex;align-items:center;gap:8px;pointer-events:none}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .skeleton{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);
+      background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .skel-line{height:14px;margin:8px 0}.skel-sm{width:60%}.skel-md{width:80%}
+    .skel-block{height:52px;border-radius:8px;margin:8px 0}
+    .fade-in{animation:fadeIn .35s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .leaflet-popup-content-wrapper{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 32px rgba(0,0,0,.5)!important;color:var(--text)!important}
+    .leaflet-popup-tip{background:var(--surface)!important}
+    .leaflet-popup-content{margin:14px 16px!important}
+    .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border)!important}
+    .leaflet-control-zoom a:hover{background:var(--surface2)!important;color:var(--accent)!important}
+    .leaflet-control-attribution{background:rgba(13,17,23,.7)!important;color:var(--muted)!important}
+    .leaflet-control-attribution a{color:var(--accent)!important}
+    footer{text-align:center;font-size:12px;color:var(--muted);padding-top:4px}
+    footer a{color:var(--accent);text-decoration:none}
+    footer a:hover{text-decoration:underline}
   </style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans">
+<body>
 
-  <div id="context-menu">
-    <div id="ctx-coords" class="menu-coords"></div>
-    <div class="menu-item" id="ctx-find">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Find district / parliament / DUN
+<div id="toast">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toast-msg">Copied!</span>
+</div>
+
+<div id="context-menu">
+  <div class="ctx-coords" id="ctx-coords"></div>
+  <div class="ctx-item" id="ctx-find">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    Find boundaries here
+  </div>
+  <div class="ctx-item" id="ctx-copy">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    Copy coordinates
+  </div>
+  <div class="ctx-item" id="ctx-share">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    Share this location
+  </div>
+</div>
+
+<div class="app-wrap">
+  <header>
+    <span class="header-badge">🇲🇾 Geospatial Tool</span>
+    <h1>Malaysia Boundary Finder</h1>
+    <p>Search by address or coordinates — or <strong>right-click</strong> anywhere on the map</p>
+  </header>
+
+  <div class="search-row">
+    <div class="search-wrap">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="searchInput" type="text" placeholder="Address, place name, or lat, lng — e.g. Petaling Jaya or 3.1478, 101.6953"/>
     </div>
-    <div class="menu-item" id="ctx-copy">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-      Copy coordinates
+    <button class="btn btn-primary" id="searchBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Search
+    </button>
+    <button class="btn btn-icon" id="locateBtn" title="Use my location">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="toggles-row">
+    <span class="toggles-label">Layers</span>
+    <label class="layer-toggle active" data-layer="district">
+      <span class="dot" style="background:var(--district)"></span>District
+    </label>
+    <label class="layer-toggle active" data-layer="parliament">
+      <span class="dot" style="background:var(--parliament)"></span>Parliament
+    </label>
+    <label class="layer-toggle active" data-layer="dun">
+      <span class="dot" style="background:var(--dun)"></span>DUN
+    </label>
+    <span style="margin-left:auto;font-size:11px;color:var(--muted)">Toggle boundary layers</span>
+  </div>
+
+  <div class="main-grid">
+    <div class="sidebar">
+      <div class="card">
+        <div class="card-header">
+          <span>Boundary Result</span>
+          <button id="clearResultBtn" class="btn btn-ghost" style="display:none">Clear</button>
+        </div>
+        <div class="card-body" id="resultsPanel">
+          <div class="result-placeholder">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+            </svg>
+            <p>Search for a location or right-click the map to find its administrative boundaries.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span>Recent Searches</span>
+          <button id="clearHistoryBtn" class="btn btn-ghost">Clear</button>
+        </div>
+        <div class="card-body" style="padding:8px">
+          <div class="history-list" id="historyList">
+            <p class="history-empty">No recent searches yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Loading boundary data…</div>
+      </div>
+      <div class="map-overlay-btns">
+        <div class="map-btn" id="mapStyleBtn" title="Cycle map style">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"/><path d="M9 3v15M15 6v15"/>
+          </svg>
+        </div>
+        <div class="map-btn" id="fitMalaysiaBtn" title="Reset view">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/><path d="M3 12h4M17 12h4M12 3v4M12 17v4"/>
+          </svg>
+        </div>
+        <div class="map-btn" id="fullscreenBtn" title="Fullscreen">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+        </div>
+      </div>
+      <div class="map-status">
+        <span class="status-dot"></span>
+        <span id="mapStatusText">Initialising…</span>
+      </div>
     </div>
   </div>
 
-  <div class="container mx-auto p-4 max-w-5xl">
-    <h1 class="text-2xl font-bold mb-1 text-center">Malaysia Administrative Boundary Finder</h1>
-    <p class="text-center text-sm text-gray-500 mb-4">Search by address or coordinates — or <strong>right-click</strong> anywhere on the map</p>
+  <footer>
+    <p>Powered by <a href="https://openstreetmap.org" target="_blank">OpenStreetMap</a> · <a href="https://github.com/dosm-malaysia/data-open" target="_blank">DOSM GeoData</a> · <a href="https://leafletjs.com/" target="_blank">Leaflet</a> · <a href="https://turfjs.org/" target="_blank">Turf.js</a> — coded by pisczcek</p>
+  </footer>
+</div>
 
-    <div class="flex flex-col md:flex-row gap-4 mb-4">
-      <input id="searchInput" type="text" placeholder="e.g. 1.5581, 103.6386 or Kulai" class="flex-grow p-3 border rounded-lg" />
-      <button id="searchBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">Search</button>
-    </div>
+<script>
+/* Load Leaflet → Turf in order, then boot */
+function loadScript(src) {
+  return new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = function() { reject(new Error('Could not load ' + src)); };
+    document.head.appendChild(s);
+  });
+}
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="bg-white p-4 rounded shadow space-y-2" id="resultsPanel">
-        <p class="text-gray-400 text-sm">Search result will appear here.<br><br>
-          <span class="text-xs text-gray-400">Tip: Right-click on the map to instantly find a location's boundaries.</span>
-        </p>
-      </div>
-      <div class="md:col-span-2">
-        <div id="map" class="rounded shadow"></div>
-      </div>
-    </div>
+loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
+  .then(function() { return loadScript('https://unpkg.com/@turf/turf@6/turf.min.js'); })
+  .then(boot)
+  .catch(function(err) {
+    document.getElementById('loadingText').textContent = 'Failed to load map libraries';
+    console.error(err);
+  });
 
-    <footer class="text-center text-sm text-gray-500 mt-8">
-      <p>Powered by <a href="https://openstreetmap.org" target="_blank" class="text-blue-600 hover:underline">OpenStreetMap</a>, <a href="https://github.com/dosm-malaysia/data-open" target="_blank" class="text-blue-600 hover:underline">DOSM GeoData</a>, <a href="https://leafletjs.com/" target="_blank" class="text-blue-600 hover:underline">Leaflet</a>, <a href="https://turfjs.org/" target="_blank" class="text-blue-600 hover:underline">Turf.js</a> &amp; Anthropic Claude. - coded by pisczcek -</p>
-    </footer>
-  </div>
+function boot() {
 
-  <script>
-    const map = L.map('map').setView([4.2105, 108.9758], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+  /* ── Tile definitions ── */
+  var TILES = {
+    dark: { url:'https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png', attr:'&copy; OSM &copy; CARTO' },
+    osm:  { url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',              attr:'&copy; OpenStreetMap contributors' },
+    topo: { url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                attr:'&copy; OSM &copy; OpenTopoMap' }
+  };
+  var tileKeys = ['dark','osm','topo'];
+  var tileIdx  = 0;
+  var tileLayers = {};
+  Object.keys(TILES).forEach(function(k) {
+    tileLayers[k] = L.tileLayer(TILES[k].url, { attribution: TILES[k].attr, maxZoom: 19 });
+  });
 
-    let userMarker;
-    let activeLayers = [];
-    let labelMarkers = [];
+  /* ── Map ── */
+  var map = L.map('map').setView([4.2105, 108.9758], 6);
+  tileLayers.dark.addTo(map);
 
-    const files = {
-      district:   'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/administrative_2_district.geojson',
-      parliament: 'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_0_parlimen.geojson',
-      dun:        'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_1_dun.geojson'
-    };
+  /* ── Geodata ── */
+  var GEO_URLS = {
+    district:   'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/administrative_2_district.geojson',
+    parliament: 'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_0_parlimen.geojson',
+    dun:        'https://raw.githubusercontent.com/dosm-malaysia/data-open/refs/heads/main/datasets/geodata/electoral_1_dun.geojson'
+  };
+  var FIELD  = { district:'district', parliament:'parlimen', dun:'dun' };
+  var COLORS = { district:'#f97316',  parliament:'#38bdf8',  dun:'#4ade80' };
 
-    const geoData = {};
-    let contextLatLng = null;
+  var geoData = {};
+  var vizLayers   = { district:[], parliament:[], dun:[] };
+  var labelArr    = [];
+  var layerOn     = { district:true, parliament:true, dun:true };
+  var userMarker  = null;
+  var ctxLatLng   = null;
+  var history     = [];
 
-    async function loadGeoJSONs() {
-      for (const [key, url] of Object.entries(files)) {
-        const res = await fetch(url);
-        geoData[key] = await res.json();
-      }
+  setStatus('Loading boundary data…');
+
+  var dataReady = (function() {
+    var keys = Object.keys(GEO_URLS);
+    var i = 0;
+    function next() {
+      if (i >= keys.length) return Promise.resolve();
+      var key = keys[i++];
+      return fetch(GEO_URLS[key]).then(function(r) {
+        if (!r.ok) throw new Error('Fetch failed');
+        return r.json();
+      }).then(function(json) {
+        geoData[key] = json;
+        return next();
+      });
     }
+    return next();
+  })();
 
-    loadGeoJSONs().then(() => {
-      document.getElementById('searchBtn').addEventListener('click', handleSearch);
-      document.getElementById('searchInput').addEventListener('keypress', e => {
-        if (e.key === 'Enter') handleSearch();
+  dataReady.then(function() {
+    var ov = document.getElementById('loadingOverlay');
+    ov.classList.add('hidden');
+    setTimeout(function() { ov.style.display = 'none'; }, 350);
+    setStatus('Ready — right-click map to look up boundaries');
+    var p = new URLSearchParams(location.search);
+    var plat = parseFloat(p.get('lat')), plng = parseFloat(p.get('lng'));
+    if (!isNaN(plat) && !isNaN(plng)) runLookup(plat, plng, null);
+  }).catch(function() {
+    document.getElementById('loadingText').textContent = '⚠ Geodata load error';
+    setStatus('Data load failed');
+  });
+
+  /* ── Search ── */
+  function handleSearch() {
+    var q = document.getElementById('searchInput').value.trim();
+    if (!q) return;
+    setStatus('Searching…');
+    var lat, lon, label;
+    if (/^-?\d+\.?\d*,\s*-?\d+\.?\d*$/.test(q)) {
+      var parts = q.split(',');
+      lat = parseFloat(parts[0]); lon = parseFloat(parts[1]); label = null;
+      runLookup(lat, lon, label);
+    } else {
+      fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q) + '&countrycodes=my&limit=1')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d.length) { toast('Location not found'); setStatus('Not found'); return; }
+          runLookup(parseFloat(d[0].lat), parseFloat(d[0].lon), d[0].display_name);
+        }).catch(function() { toast('Search error'); setStatus('Search error'); });
+    }
+  }
+
+  document.getElementById('searchBtn').addEventListener('click', handleSearch);
+  document.getElementById('searchInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') handleSearch(); });
+
+  /* ── Locate me ── */
+  document.getElementById('locateBtn').addEventListener('click', function() {
+    if (!navigator.geolocation) { toast('Geolocation not supported'); return; }
+    setStatus('Acquiring GPS…');
+    navigator.geolocation.getCurrentPosition(
+      function(pos) { runLookup(pos.coords.latitude, pos.coords.longitude, null); },
+      function()    { toast('Location denied'); setStatus('Location denied'); }
+    );
+  });
+
+  /* ── Map style ── */
+  document.getElementById('mapStyleBtn').addEventListener('click', function() {
+    map.removeLayer(tileLayers[tileKeys[tileIdx]]);
+    tileIdx = (tileIdx + 1) % tileKeys.length;
+    tileLayers[tileKeys[tileIdx]].addTo(map);
+    toast('Map: ' + tileKeys[tileIdx].toUpperCase());
+  });
+  document.getElementById('fitMalaysiaBtn').addEventListener('click', function() {
+    map.flyTo([4.2105, 108.9758], 6, { duration: 1.2 });
+  });
+  document.getElementById('fullscreenBtn').addEventListener('click', function() {
+    var el = document.querySelector('.map-wrap');
+    if (!document.fullscreenElement) el.requestFullscreen && el.requestFullscreen();
+    else document.exitFullscreen && document.exitFullscreen();
+  });
+
+  /* ── Layer toggles ── */
+  document.querySelectorAll('.layer-toggle').forEach(function(el) {
+    el.addEventListener('click', function() {
+      var k = el.dataset.layer;
+      layerOn[k] = !layerOn[k];
+      el.classList.toggle('active', layerOn[k]);
+      vizLayers[k].forEach(function(l) { layerOn[k] ? l.addTo(map) : map.removeLayer(l); });
+      labelArr.forEach(function(m) {
+        if (m._lk === k) { layerOn[k] ? m.addTo(map) : map.removeLayer(m); }
       });
     });
+  });
 
-    // ── Right-click context menu ─────────────────────────────────────────────
-    const ctxMenu = document.getElementById('context-menu');
-    const ctxCoords = document.getElementById('ctx-coords');
+  /* ── Clear buttons ── */
+  document.getElementById('clearResultBtn').addEventListener('click', function() {
+    clearLayers();
+    if (userMarker) { userMarker.remove(); userMarker = null; }
+    document.getElementById('resultsPanel').innerHTML = '<div class="result-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><p>Search for a location or right-click the map.</p></div>';
+    document.getElementById('clearResultBtn').style.display = 'none';
+  });
+  document.getElementById('clearHistoryBtn').addEventListener('click', function() {
+    history = []; renderHistory(); toast('History cleared');
+  });
 
-    map.on('contextmenu', (e) => {
-      e.originalEvent.preventDefault();
-      contextLatLng = e.latlng;
+  /* ── Context menu ── */
+  var ctxMenu = document.getElementById('context-menu');
+  map.on('contextmenu', function(e) {
+    e.originalEvent.preventDefault();
+    ctxLatLng = e.latlng;
+    document.getElementById('ctx-coords').textContent = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+    var x = e.originalEvent.clientX, y = e.originalEvent.clientY;
+    ctxMenu.style.left = Math.min(x, window.innerWidth  - 240) + 'px';
+    ctxMenu.style.top  = Math.min(y, window.innerHeight - 160) + 'px';
+    ctxMenu.style.display = 'block';
+  });
+  document.addEventListener('click', function() { ctxMenu.style.display = 'none'; });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') ctxMenu.style.display = 'none'; });
+  document.getElementById('ctx-find').addEventListener('click', function() { if (ctxLatLng) runLookup(ctxLatLng.lat, ctxLatLng.lng, null); });
+  document.getElementById('ctx-copy').addEventListener('click', function() { if (ctxLatLng) copyText(ctxLatLng.lat.toFixed(6) + ', ' + ctxLatLng.lng.toFixed(6)); });
+  document.getElementById('ctx-share').addEventListener('click', function() {
+    if (ctxLatLng) copyText(location.origin + location.pathname + '?lat=' + ctxLatLng.lat.toFixed(6) + '&lng=' + ctxLatLng.lng.toFixed(6), 'Share link copied!');
+  });
 
-      ctxCoords.textContent = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+  /* ── Core lookup ── */
+  function runLookup(lat, lon, label) {
+    dataReady.then(function() {
+      showSkeleton();
+      clearLayers();
+      setStatus('Looking up…');
 
-      const x = e.originalEvent.clientX;
-      const y = e.originalEvent.clientY;
-      ctxMenu.style.left = Math.min(x, window.innerWidth  - 240) + 'px';
-      ctxMenu.style.top  = Math.min(y, window.innerHeight - 120) + 'px';
-      ctxMenu.style.display = 'block';
-    });
+      var afterLabel = function(lbl) {
+        var pt  = turf.point([lon, lat]);
+        var res = {};
+        var keys = Object.keys(geoData);
+        keys.forEach(function(key) {
+          var match = null;
+          for (var i = 0; i < geoData[key].features.length; i++) {
+            if (turf.booleanPointInPolygon(pt, geoData[key].features[i])) {
+              match = geoData[key].features[i]; break;
+            }
+          }
+          if (match) {
+            res[key] = match.properties && match.properties[FIELD[key]] ? match.properties[FIELD[key]] : null;
+            var layer = L.geoJSON(match, { style: { color: COLORS[key], weight: 2.5, fillColor: COLORS[key], fillOpacity: 0.08 } });
+            vizLayers[key].push(layer);
+            if (layerOn[key]) layer.addTo(map);
 
-    document.addEventListener('click', () => ctxMenu.style.display = 'none');
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') ctxMenu.style.display = 'none'; });
+            var c = turf.centerOfMass(match).geometry.coordinates;
+            var lm = L.marker([c[1], c[0]], {
+              icon: L.divIcon({
+                className: '',
+                html: '<div style="font-family:\'DM Sans\',sans-serif;font-size:11px;font-weight:600;color:' + COLORS[key] + ';background:rgba(13,17,23,.92);border:1px solid ' + COLORS[key] + '40;padding:3px 9px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4)">' + key.charAt(0).toUpperCase() + key.slice(1) + ': ' + res[key] + '</div>',
+                iconAnchor: [0, 0]
+              })
+            });
+            lm._lk = key;
+            labelArr.push(lm);
+            if (layerOn[key]) lm.addTo(map);
+          } else {
+            res[key] = null;
+          }
+        });
 
-    document.getElementById('ctx-find').addEventListener('click', () => {
-      if (!contextLatLng) return;
-      ctxMenu.style.display = 'none';
-      runLookup(contextLatLng.lat, contextLatLng.lng, null);
-    });
+        if (userMarker) userMarker.remove();
+        userMarker = L.marker([lat, lon], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div style="width:14px;height:14px;border-radius:50%;background:#14b8a6;border:3px solid white;box-shadow:0 0 0 3px rgba(20,184,166,.4),0 2px 8px rgba(0,0,0,.5)"></div>',
+            iconAnchor: [7, 7]
+          })
+        }).addTo(map).bindPopup(buildPopup(lbl, lat, lon, res), { maxWidth: 280 }).openPopup();
 
-    document.getElementById('ctx-copy').addEventListener('click', () => {
-      if (!contextLatLng) return;
-      ctxMenu.style.display = 'none';
-      const text = `${contextLatLng.lat.toFixed(6)}, ${contextLatLng.lng.toFixed(6)}`;
-      navigator.clipboard.writeText(text).catch(() => {});
-    });
+        map.flyTo([lat, lon], 12, { duration: 1 });
+        setStatus((res.district||'—') + ' · ' + (res.parliament||'—') + ' · ' + (res.dun||'—'));
+        renderResults(lat, lon, lbl, res);
+        addHistory(lat, lon, lbl, res);
+        document.getElementById('clearResultBtn').style.display = '';
+      };
 
-    // ── Main search ──────────────────────────────────────────────────────────
-    async function handleSearch() {
-      const query = document.getElementById('searchInput').value.trim();
-      if (!query) return;
-
-      let lat, lon, label;
-
-      if (/^-?\d+\.?\d*,\s*-?\d+\.?\d*$/.test(query)) {
-        [lat, lon] = query.split(',').map(Number);
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-        const data = await res.json();
-        label = data.display_name || `Coordinates: ${lat}, ${lon}`;
+      if (label) {
+        afterLabel(label);
       } else {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=my&limit=1`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (!data.length) return alert("Location not found.");
-        lat = parseFloat(data[0].lat);
-        lon = parseFloat(data[0].lon);
-        label = data[0].display_name;
+        fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon)
+          .then(function(r) { return r.json(); })
+          .then(function(d) { afterLabel(d.display_name || (lat.toFixed(5) + ', ' + lon.toFixed(5))); })
+          .catch(function()  { afterLabel(lat.toFixed(5) + ', ' + lon.toFixed(5)); });
       }
+    });
+  }
 
-      runLookup(lat, lon, label);
-    }
+  function buildPopup(label, lat, lon, res) {
+    var r = function(lbl, val, col) {
+      return val
+        ? '<div style="font-size:12px;margin:4px 0"><span style="color:' + col + ';font-weight:600">' + lbl + ' </span><span style="color:#e6edf3">' + val + '</span></div>'
+        : '<div style="font-size:12px;color:#7d8590;margin:4px 0">' + lbl + ' <em>not found</em></div>';
+    };
+    var short = label.split(',').slice(0,3).join(',');
+    return '<div style="font-family:\'DM Sans\',sans-serif">'
+      + '<div style="font-size:13px;font-weight:500;color:#e6edf3;margin-bottom:10px;line-height:1.4">' + short + '</div>'
+      + r('District',   res.district,   '#f97316')
+      + r('Parliament', res.parliament, '#38bdf8')
+      + r('DUN',        res.dun,        '#4ade80')
+      + '<div style="margin-top:8px;font-size:10px;color:#7d8590;font-family:monospace">' + lat.toFixed(6) + ', ' + lon.toFixed(6) + '</div>'
+      + '</div>';
+  }
 
-    // ── Core lookup ──────────────────────────────────────────────────────────
-    async function runLookup(lat, lon, label) {
-      const point = turf.point([lon, lat]);
+  /* ── Render panels ── */
+  function showSkeleton() {
+    document.getElementById('resultsPanel').innerHTML =
+      '<div class="skeleton skel-line skel-md"></div>' +
+      '<div class="skeleton skel-line skel-sm" style="margin-bottom:16px"></div>' +
+      '<div class="skeleton skel-block"></div>' +
+      '<div class="skeleton skel-block"></div>' +
+      '<div class="skeleton skel-block"></div>';
+  }
 
-      activeLayers.forEach(l => map.removeLayer(l));
-      labelMarkers.forEach(m => map.removeLayer(m));
-      activeLayers = [];
-      labelMarkers = [];
+  function renderResults(lat, lon, label, res) {
+    var short = label.split(',').slice(0,3).join(',');
+    var items = [
+      { k:'district',   lb:'District',   c:'#f97316' },
+      { k:'parliament', lb:'Parliament', c:'#38bdf8' },
+      { k:'dun',        lb:'DUN',        c:'#4ade80' }
+    ];
+    var rows = items.map(function(it) {
+      var copyBtn = res[it.k] ? '<button class="copy-btn" data-copy="' + esc(res[it.k]) + '" title="Copy"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '';
+      var valHtml = res[it.k] ? '<span class="result-value">' + res[it.k] + '</span>' : '<span class="not-found-badge">Not found</span>';
+      return '<div class="result-item"><span class="result-dot" style="background:' + it.c + '"></span><div><span class="result-label">' + it.lb + '</span>' + valHtml + '</div>' + copyBtn + '</div>';
+    }).join('');
 
-      if (!label) {
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-          const data = await res.json();
-          label = data.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-        } catch {
-          label = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-        }
-      }
+    var allText = 'District: '+(res.district||'—')+'\nParliament: '+(res.parliament||'—')+'\nDUN: '+(res.dun||'—')+'\nCoords: '+lat.toFixed(6)+', '+lon.toFixed(6);
+    var shareUrl = location.origin + location.pathname + '?lat=' + lat.toFixed(6) + '&lng=' + lon.toFixed(6);
 
-      const fieldMap = { district: 'district', parliament: 'parlimen', dun: 'dun' };
-      const colors   = { district: '#ff7800', parliament: '#007bff', dun: '#28a745' };
-      const results  = {};
+    document.getElementById('resultsPanel').innerHTML =
+      '<div class="fade-in">' +
+      '<p class="result-location">' + short + '</p>' +
+      '<p class="result-coords">' + lat.toFixed(6) + ', ' + lon.toFixed(6) + '</p>' +
+      '<div class="result-items">' + rows + '</div>' +
+      '<div class="result-actions">' +
+      '<button class="btn btn-ghost" data-copy-all="' + esc(allText) + '" data-msg="All results copied!">' +
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy All</button>' +
+      '<button class="btn btn-ghost" data-copy-all="' + esc(shareUrl) + '" data-msg="Share link copied!">' +
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share</button>' +
+      '</div></div>';
 
-      for (const [key, data] of Object.entries(geoData)) {
-        const match = data.features.find(f => turf.booleanPointInPolygon(point, f));
-        if (match) {
-          const field = fieldMap[key];
-          results[key] = match.properties?.[field] || 'Not found';
+    document.querySelectorAll('[data-copy]').forEach(function(b) {
+      b.addEventListener('click', function() { copyText(b.dataset.copy); });
+    });
+    document.querySelectorAll('[data-copy-all]').forEach(function(b) {
+      b.addEventListener('click', function() { copyText(b.dataset.copyAll, b.dataset.msg || 'Copied!'); });
+    });
+  }
 
-          const layer = L.geoJSON(match, {
-            style: { color: colors[key], weight: 3, fillOpacity: 0.1 }
-          }).addTo(map);
-          activeLayers.push(layer);
+  function addHistory(lat, lon, label, res) {
+    history.unshift({ lat:lat, lon:lon, label:label, short:label.split(',')[0], res:res });
+    if (history.length > 8) history.pop();
+    renderHistory();
+  }
 
-          const center = turf.centerOfMass(match).geometry.coordinates;
-          const lm = L.marker([center[1], center[0]], {
-            icon: L.divIcon({
-              className: 'text-sm font-semibold text-black bg-white px-2 py-1 rounded shadow',
-              html: `<span style="font-size:12px;background:white;border:1px solid #ccc;padding:2px 7px;border-radius:4px;white-space:nowrap">${key.charAt(0).toUpperCase()+key.slice(1)}: ${results[key]}</span>`
-            })
-          }).addTo(map);
-          labelMarkers.push(lm);
-        } else {
-          results[key] = 'Not found';
-        }
-      }
+  function renderHistory() {
+    var list = document.getElementById('historyList');
+    if (!history.length) { list.innerHTML = '<p class="history-empty">No recent searches yet.</p>'; return; }
+    list.innerHTML = history.map(function(h, i) {
+      return '<div class="history-item" data-idx="' + i + '">' +
+        '<div class="history-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>' +
+        '<div style="flex:1;min-width:0"><div class="history-name">' + h.short + '</div><div class="history-sub">' + (h.res.district||'—') + ' · ' + (h.res.parliament||'—') + '</div></div>' +
+        '<div style="font-size:10px;color:var(--muted)">#' + (i+1) + '</div></div>';
+    }).join('');
+    list.querySelectorAll('.history-item').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var h = history[parseInt(el.dataset.idx)];
+        runLookup(h.lat, h.lon, h.label);
+      });
+    });
+  }
 
-      if (userMarker) userMarker.remove();
-      userMarker = L.marker([lat, lon]).addTo(map)
-        .bindPopup(`
-          <strong style="font-size:13px">${label}</strong><br>
-          <b>District:</b> ${results.district}<br>
-          <b>Parliament:</b> ${results.parliament}<br>
-          <b>DUN:</b> ${results.dun}
-        `).openPopup();
-      map.setView([lat, lon], 12);
+  /* ── Helpers ── */
+  function clearLayers() {
+    Object.keys(vizLayers).forEach(function(k) { vizLayers[k].forEach(function(l) { map.removeLayer(l); }); vizLayers[k] = []; });
+    labelArr.forEach(function(l) { map.removeLayer(l); });
+    labelArr.length = 0;
+  }
 
-      // Show results panel immediately, with ADUN loading
-      const panel = document.getElementById('resultsPanel');
-      panel.innerHTML = `
-        <div>
-          <p class="text-xs text-gray-400 mb-1">Location</p>
-          <p class="text-sm font-medium text-blue-700 leading-snug">${label}</p>
-          <p class="text-xs text-gray-400 mt-1">${lat.toFixed(6)}, ${lon.toFixed(6)}</p>
-        </div>
-        <div class="border-t pt-3 space-y-2 mt-2">
-          <p class="text-sm"><span class="result-badge badge-district">District</span> <span class="font-medium">${results.district}</span></p>
-          <p class="text-sm"><span class="result-badge badge-parliament">Parliament</span> <span class="font-medium">${results.parliament}</span></p>
-          <p class="text-sm"><span class="result-badge badge-dun">DUN</span> <span class="font-medium">${results.dun}</span></p>
-        </div>
-      `;
-    }
+  function setStatus(msg) { document.getElementById('mapStatusText').textContent = msg; }
 
-  </script>
+  function copyText(text, msg) {
+    navigator.clipboard.writeText(text).then(function() { toast(msg || 'Copied!'); }).catch(function() { toast('Copy unavailable'); });
+  }
+
+  function toast(msg) {
+    var el = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(function() { el.classList.remove('show'); }, 2400);
+  }
+
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+}
+</script>
 </body>
 </html>
