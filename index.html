@@ -6,29 +6,39 @@
   <title>Malaysia Boundary Finder</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
     :root {
       --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
       --text:#e6edf3;--muted:#7d8590;--accent:#14b8a6;
-      --district:#f97316;--parliament:#38bdf8;--dun:#4ade80;--danger:#f87171;--r:10px;
+      --district:#f97316;--parliament:#38bdf8;--dun:#4ade80;--danger:#f87171;--r:12px;
+      --shadow:0 16px 48px rgba(0,0,0,.24);--header-grad:#e6edf3;--grid-opacity:.04;
+      --popup-bg:#161b22;--popup-text:#e6edf3;
+    }
+    html[data-theme="light"]{
+      --bg:#f4f7fb;--surface:#ffffff;--surface2:#eef3f7;--border:#d7e0e8;
+      --text:#18212b;--muted:#647383;--accent:#0f8f83;--danger:#d84b4b;
+      --shadow:0 16px 48px rgba(24,33,43,.10);--header-grad:#18212b;--grid-opacity:.045;
+      --popup-bg:#ffffff;--popup-text:#18212b;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;overflow-x:hidden}
     body::before{content:'';position:fixed;inset:0;
-      background-image:linear-gradient(rgba(20,184,166,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(20,184,166,.04) 1px,transparent 1px);
+      background-image:linear-gradient(rgba(20,184,166,var(--grid-opacity)) 1px,transparent 1px),linear-gradient(90deg,rgba(20,184,166,var(--grid-opacity)) 1px,transparent 1px);
       background-size:40px 40px;pointer-events:none;z-index:0}
     .app-wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:24px 20px;display:flex;flex-direction:column;gap:20px}
-    header{display:flex;flex-direction:column;align-items:center;gap:6px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:4px 2px}
+    .brand{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+    .header-actions{display:flex;align-items:center;gap:8px}
     .header-badge{font-family:'Syne',sans-serif;font-size:11px;letter-spacing:.15em;text-transform:uppercase;
       color:var(--accent);background:rgba(20,184,166,.12);border:1px solid rgba(20,184,166,.25);padding:3px 12px;border-radius:99px}
     h1{font-family:'Syne',sans-serif;font-size:clamp(1.6rem,4vw,2.4rem);font-weight:800;letter-spacing:-.02em;
-      background:linear-gradient(135deg,#e6edf3 30%,var(--accent) 100%);
-      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-align:center;line-height:1.2}
-    header p{color:var(--muted);font-size:13px;text-align:center}
+      background:linear-gradient(135deg,var(--header-grad) 30%,var(--accent) 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-align:left;line-height:1.2}
+    header p{color:var(--muted);font-size:13px;text-align:left}
     header p strong{color:var(--accent);font-weight:500}
     .search-row{display:flex;gap:10px;align-items:stretch}
     .search-wrap{flex:1;position:relative}
@@ -42,6 +52,7 @@
       font-size:13px;font-weight:600;letter-spacing:.04em;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s}
     .btn-primary{background:var(--accent);color:#0d1117}
     .btn-primary:hover{background:#0fd3be;transform:translateY(-1px)}
+    .btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
     .btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--border)}
     .btn-ghost:hover{background:var(--surface2);border-color:var(--accent);color:var(--accent)}
     .btn-icon{width:48px;height:48px;padding:0;justify-content:center;background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:var(--r)}
@@ -59,10 +70,11 @@
     .layer-toggle[data-layer="district"].active{background:rgba(249,115,22,.1)}
     .layer-toggle[data-layer="parliament"].active{background:rgba(56,189,248,.1)}
     .layer-toggle[data-layer="dun"].active{background:rgba(74,222,128,.1)}
-    .main-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
-    @media(max-width:768px){.main-grid{grid-template-columns:1fr}.sidebar{order:2}.map-wrap{order:1}}
+    .main-grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:16px;align-items:start}
+    @media(max-width:860px){.main-grid{grid-template-columns:1fr}.sidebar{order:2}.map-wrap{order:1}header{align-items:flex-start}.search-row{flex-wrap:wrap}.search-wrap{flex-basis:100%}}
+    @media(max-width:520px){.app-wrap{padding:14px 12px}header{flex-direction:column}.header-actions{width:100%}.header-actions .btn{flex:1}.search-row>.btn-primary{flex:1}.toggles-row>span:last-child{display:none}}
     .sidebar{display:flex;flex-direction:column;gap:12px}
-    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
     .card-header{padding:12px 16px;border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;
       font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
       display:flex;align-items:center;justify-content:space-between}
@@ -89,26 +101,41 @@
     .result-actions{display:flex;gap:8px;margin-top:14px}
     .result-actions .btn{height:36px;font-size:12px;flex:1;padding:0 12px}
     .not-found-badge{font-size:11px;color:var(--danger);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);padding:2px 8px;border-radius:99px}
-    .history-list{display:flex;flex-direction:column;gap:4px}
+    .history-list{display:flex;flex-direction:column;gap:4px;max-height:236px;overflow-y:auto;overscroll-behavior:contain;padding-right:3px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+    .history-list::-webkit-scrollbar{width:6px}
+    .history-list::-webkit-scrollbar-track{background:transparent}
+    .history-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+    .history-list::-webkit-scrollbar-thumb:hover{background:var(--muted)}
     .history-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;transition:background .15s}
     .history-item:hover{background:var(--surface2)}
     .history-icon{width:28px;height:28px;border-radius:6px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted)}
     .history-name{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
     .history-sub{font-size:10px;color:var(--muted)}
     .history-empty{color:var(--muted);font-size:12px;padding:12px 4px;text-align:center}
-    .map-wrap{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}
-    #map{height:580px;background:#0d1117}
+    .map-wrap{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow)}
+    #map{height:680px;background:var(--bg)}
+    .map-wrap:fullscreen #map{height:100vh}
+    .upload-zone{border:1.5px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:.18s;background:var(--surface2)}
+    .upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(20,184,166,.08)}
+    .upload-zone input{display:none}.upload-title{font-weight:600;color:var(--text);font-size:13px;margin-top:7px}.upload-help{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5}
+    .batch-summary{display:none;margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--surface2);font-size:12px;line-height:1.55;color:var(--muted)}
+    .batch-summary strong{color:var(--text)}.batch-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.batch-actions .btn{height:34px;font-size:11px;padding:0 10px;flex:1}
+    .progress{display:none;height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:10px}.progress>span{display:block;width:0;height:100%;background:var(--accent);transition:width .2s}
+    .section-note{font-size:11px;line-height:1.55;color:var(--muted);margin-bottom:10px}
+    .history-actions{display:flex;gap:5px}.history-actions .btn{height:24px;padding:0 8px;font-size:10px}
+    .batch-marker{width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,.45)}
+    .boundary-label{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;background:var(--surface);padding:3px 9px;border-radius:5px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25)}
     .map-overlay-btns{position:absolute;top:12px;right:12px;z-index:500;display:flex;flex-direction:column;gap:6px}
     .map-btn{width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:8px;
       display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:all .15s}
     .map-btn:hover{background:var(--surface2);color:var(--accent);border-color:var(--accent)}
-    .map-status{position:absolute;bottom:12px;left:12px;z-index:500;background:rgba(13,17,23,.85);
+    .map-status{position:absolute;bottom:12px;left:12px;z-index:500;background:var(--surface);
       border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:11px;color:var(--muted);
       backdrop-filter:blur(6px);display:flex;align-items:center;gap:6px;
       max-width:calc(100% - 70px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .status-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:blink 2s infinite}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-    #loadingOverlay{position:absolute;inset:0;z-index:600;background:rgba(13,17,23,.88);
+    #loadingOverlay{position:absolute;inset:0;z-index:600;background:var(--surface);
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
       border-radius:var(--r);transition:opacity .3s}
     #loadingOverlay.hidden{opacity:0;pointer-events:none}
@@ -135,16 +162,103 @@
     .skel-block{height:52px;border-radius:8px;margin:8px 0}
     .fade-in{animation:fadeIn .35s ease}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-    .leaflet-popup-content-wrapper{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 32px rgba(0,0,0,.5)!important;color:var(--text)!important}
-    .leaflet-popup-tip{background:var(--surface)!important}
+    .leaflet-popup-content-wrapper{background:var(--popup-bg)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 32px rgba(0,0,0,.3)!important;color:var(--popup-text)!important}
+    .leaflet-popup-tip{background:var(--popup-bg)!important}
     .leaflet-popup-content{margin:14px 16px!important}
     .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border)!important}
     .leaflet-control-zoom a:hover{background:var(--surface2)!important;color:var(--accent)!important}
-    .leaflet-control-attribution{background:rgba(13,17,23,.7)!important;color:var(--muted)!important}
+    .leaflet-control-attribution{background:var(--surface)!important;color:var(--muted)!important;opacity:.88}
     .leaflet-control-attribution a{color:var(--accent)!important}
     footer{text-align:center;font-size:12px;color:var(--muted);padding-top:4px}
     footer a{color:var(--accent);text-decoration:none}
     footer a:hover{text-decoration:underline}
+
+    /* Professional dashboard visual system */
+    :root{
+      --bg:#08111f;--surface:#0f1b2d;--surface2:#162338;--border:#26354b;
+      --text:#f1f5f9;--muted:#8fa1b7;--accent:#2dd4bf;--accent-strong:#14b8a6;
+      --r:16px;--shadow:0 14px 38px rgba(0,0,0,.22);--popup-bg:#0f1b2d;--popup-text:#f1f5f9;
+    }
+    html[data-theme="light"]{
+      --bg:#f2f5f9;--surface:#ffffff;--surface2:#f5f8fb;--border:#dce4ed;
+      --text:#152235;--muted:#66758a;--accent:#0f9488;--accent-strong:#0f766e;
+      --shadow:0 12px 32px rgba(32,51,77,.08);--popup-bg:#ffffff;--popup-text:#152235;
+    }
+    body{font-family:'Inter',sans-serif;font-size:14px;line-height:1.45;letter-spacing:-.005em}
+    body::before{background:
+      radial-gradient(circle at 8% 0%,rgba(45,212,191,.10),transparent 30%),
+      radial-gradient(circle at 92% 18%,rgba(56,189,248,.07),transparent 28%);background-size:auto}
+    .app-wrap{max-width:1440px;padding:26px 28px 20px;gap:18px}
+    .topbar{min-height:82px;padding:4px 2px 8px}
+    .brand{flex-direction:row;align-items:center;gap:14px}
+    .brand-mark{width:48px;height:48px;display:grid;place-items:center;flex:0 0 auto;border-radius:15px;
+      color:#062a28;background:linear-gradient(145deg,#5eead4,#22d3ee);box-shadow:0 10px 24px rgba(45,212,191,.2)}
+    .brand-copy{display:flex;flex-direction:column;align-items:flex-start}
+    .header-badge{font-family:'Inter',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.14em;
+      color:var(--accent);background:transparent;border:0;padding:0;margin-bottom:2px}
+    h1{font-family:'Manrope',sans-serif;font-size:clamp(1.7rem,3vw,2.35rem);font-weight:800;letter-spacing:-.045em;
+      color:var(--text);background:none;-webkit-text-fill-color:initial;line-height:1.08}
+    header p{font-size:12px;margin-top:4px;color:var(--muted)}
+    .header-actions .btn{height:42px;padding:0 14px;border-radius:11px;background:var(--surface);box-shadow:0 4px 14px rgba(0,0,0,.06)}
+    .control-panel{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px;
+      box-shadow:var(--shadow);display:flex;flex-direction:column;gap:13px}
+    .control-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+    .control-kicker,.map-eyebrow{display:block;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+    .control-heading h2,.map-panel-header h2{font-family:'Manrope',sans-serif;font-size:15px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+    .keyboard-hint{font-size:10px;font-weight:500;color:var(--muted);padding:4px 8px;border:1px solid var(--border);border-radius:7px;background:var(--surface2)}
+    .search-row{gap:9px}
+    #searchInput{height:50px;padding-left:45px;font-family:'Inter',sans-serif;font-size:13.5px;border-radius:12px;background:var(--surface2);border-color:transparent}
+    #searchInput:hover{border-color:var(--border)}
+    #searchInput:focus{background:var(--surface);border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,212,191,.12)}
+    .search-icon{left:16px}
+    .btn{height:50px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:0;border-radius:12px;justify-content:center}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-strong));color:#052f2c;box-shadow:0 7px 18px rgba(20,184,166,.18)}
+    .btn-primary:hover{filter:brightness(1.06);background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 9px 22px rgba(20,184,166,.24)}
+    .btn-ghost,.btn-icon{background:var(--surface2);border-color:transparent}
+    .btn-ghost:hover,.btn-icon:hover{background:var(--surface);border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,212,191,.08)}
+    .toggles-row{padding-top:12px;border-top:1px solid var(--border);gap:7px}
+    .toggles-label{font-family:'Inter',sans-serif;font-size:9px;font-weight:700;letter-spacing:.12em;margin-right:5px}
+    .layer-toggle{padding:6px 11px;border-radius:8px;background:var(--surface2);border-color:transparent;font-size:11px;font-weight:600}
+    .layer-toggle.active{border-color:currentColor;box-shadow:inset 0 0 0 1px currentColor}
+    .layer-help{margin-left:auto;font-size:10px;color:var(--muted)}
+    .main-grid{grid-template-columns:372px minmax(0,1fr);gap:18px;align-items:stretch}
+    .sidebar{gap:14px}
+    .card{border-radius:16px;box-shadow:var(--shadow);border-color:var(--border)}
+    .card-header{min-height:48px;padding:12px 15px;font-family:'Inter',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.11em;background:var(--surface2)}
+    .card-header .btn,.history-actions .btn{font-size:9px;height:27px;padding:0 9px;border:1px solid var(--border);background:var(--surface)}
+    .card-body{padding:16px}
+    .result-placeholder{min-height:178px;padding:28px 22px}
+    .result-placeholder svg{width:38px;height:38px;color:var(--accent);opacity:.55;padding:8px;border-radius:12px;background:rgba(45,212,191,.10)}
+    .result-placeholder p{font-size:12px;max-width:260px}
+    .result-item{padding:11px 12px;border-radius:10px;border:1px solid transparent}
+    .result-item:hover{background:var(--surface2);border-color:var(--border)}
+    .result-label{font-family:'Inter',sans-serif;font-size:9px;font-weight:700}
+    .result-value{font-size:13px;font-weight:600}
+    .history-item{padding:9px 10px;border-radius:9px}
+    .history-icon{width:32px;height:32px;border-radius:9px;color:var(--accent)}
+    .history-name{font-size:11.5px;font-weight:600}.history-sub{font-size:9.5px;margin-top:1px}
+    .upload-zone{padding:20px 14px;border-radius:12px;background:var(--surface2)}
+    .upload-zone svg{color:var(--accent)}
+    .upload-title{font-size:12px;font-weight:700}.upload-help{font-size:10px}
+    .section-note{font-size:10.5px;line-height:1.65}.section-note a{color:var(--accent);font-weight:600;text-decoration:none}
+    .batch-actions .btn{height:36px;font-size:10px;border-radius:9px}
+    .map-wrap{border-radius:16px;box-shadow:var(--shadow);background:var(--surface);height:100%;min-height:770px;display:flex;flex-direction:column}
+    .map-panel-header{height:66px;flex:0 0 66px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--surface)}
+    .map-tip{font-size:10px;color:var(--muted);padding:6px 9px;border-radius:8px;background:var(--surface2)}
+    .map-tip strong{color:var(--accent);font-weight:700}
+    #map{height:auto;min-height:704px;flex:1 1 auto}
+    .map-wrap:fullscreen #map{height:calc(100vh - 66px)}
+    .map-overlay-btns{top:80px;right:14px}
+    .map-btn{width:38px;height:38px;border-radius:10px;box-shadow:0 5px 16px rgba(0,0,0,.14)}
+    .map-status{bottom:14px;left:14px;padding:7px 11px;border-radius:9px;font-size:10px;box-shadow:0 5px 18px rgba(0,0,0,.15)}
+    .loading-text{font-family:'Inter',sans-serif;font-size:12px;font-weight:600;letter-spacing:0}
+    #context-menu{font-family:'Inter',sans-serif;border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.26)}
+    #toast{font-size:12px;border-radius:11px;box-shadow:0 12px 30px rgba(0,0,0,.22)}
+    .boundary-label{font-family:'Inter',sans-serif;font-size:10px;border-radius:7px!important}
+    footer{font-size:10.5px;padding:3px 0 6px}
+    @media(max-width:960px){.main-grid{grid-template-columns:340px minmax(0,1fr)}.map-tip{display:none}}
+    @media(max-width:860px){.main-grid{grid-template-columns:1fr;align-items:start}.topbar{align-items:center}.map-wrap{order:1;height:auto;min-height:0}.sidebar{order:2}.map-overlay-btns{top:80px}#map{height:620px;min-height:620px;flex:none}}
+    @media(max-width:620px){.app-wrap{padding:16px 12px}.topbar{align-items:flex-start}.brand-mark{width:42px;height:42px;border-radius:13px}.keyboard-hint,.layer-help{display:none}.control-panel{padding:14px}.search-row{flex-wrap:wrap}.search-wrap{flex-basis:100%}.search-row .btn-primary{flex:1}.map-panel-header{height:60px;flex-basis:60px;padding:0 14px}.map-panel-header h2{font-size:14px}#map{height:570px;min-height:570px}.map-overlay-btns{top:74px}}
   </style>
 </head>
 <body>
@@ -171,30 +285,47 @@
 </div>
 
 <div class="app-wrap">
-  <header>
-    <span class="header-badge">🇲🇾 Geospatial Tool</span>
-    <h1>Malaysia Boundary Finder</h1>
-    <p>Search by address or coordinates — or <strong>right-click</strong> anywhere on the map</p>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 10c0 5.5-8 12-8 12S4 15.5 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.8"/></svg>
+      </div>
+      <div class="brand-copy">
+        <span class="header-badge">Malaysia Administrative Intelligence</span>
+        <h1>Malaysia Boundary Finder</h1>
+        <p>District, Parliament and DUN insights in one workspace</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost" id="themeBtn" title="Switch colour theme" aria-label="Switch colour theme">
+        <span id="themeIcon">☀️</span><span id="themeLabel">Light mode</span>
+      </button>
+    </div>
   </header>
 
-  <div class="search-row">
-    <div class="search-wrap">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input id="searchInput" type="text" placeholder="Address, place name, or lat, lng — e.g. Petaling Jaya or 3.1478, 101.6953"/>
+  <section class="control-panel" aria-label="Location search and map layers">
+    <div class="control-heading">
+      <div><span class="control-kicker">Location search</span><h2>Find an administrative boundary</h2></div>
+      <span class="keyboard-hint">Press Enter to search</span>
     </div>
-    <button class="btn btn-primary" id="searchBtn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Search
-    </button>
-    <button class="btn btn-icon" id="locateBtn" title="Use my location">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/>
-      </svg>
-    </button>
-  </div>
+    <div class="search-row">
+      <div class="search-wrap">
+        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="searchInput" type="text" placeholder="Search an address, place, or coordinates — e.g. 3.1478, 101.6953"/>
+      </div>
+      <button class="btn btn-primary" id="searchBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Search
+      </button>
+      <button class="btn btn-icon" id="locateBtn" title="Use my location" aria-label="Use my current location">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/>
+        </svg>
+      </button>
+    </div>
 
   <div class="toggles-row">
-    <span class="toggles-label">Layers</span>
+    <span class="toggles-label">Visible layers</span>
     <label class="layer-toggle active" data-layer="district">
       <span class="dot" style="background:var(--district)"></span>District
     </label>
@@ -204,8 +335,9 @@
     <label class="layer-toggle active" data-layer="dun">
       <span class="dot" style="background:var(--dun)"></span>DUN
     </label>
-    <span style="margin-left:auto;font-size:11px;color:var(--muted)">Toggle boundary layers</span>
+    <span class="layer-help">Click a layer to show or hide it</span>
   </div>
+  </section>
 
   <div class="main-grid">
     <div class="sidebar">
@@ -226,7 +358,10 @@
       <div class="card">
         <div class="card-header">
           <span>Recent Searches</span>
-          <button id="clearHistoryBtn" class="btn btn-ghost">Clear</button>
+          <div class="history-actions">
+            <button id="exportHistoryBtn" class="btn btn-ghost" title="Export recent searches to CSV">Export CSV</button>
+            <button id="clearHistoryBtn" class="btn btn-ghost">Clear</button>
+          </div>
         </div>
         <div class="card-body" style="padding:8px">
           <div class="history-list" id="historyList">
@@ -234,9 +369,32 @@
           </div>
         </div>
       </div>
+      <div class="card">
+        <div class="card-header"><span>Batch Location Lookup</span><span id="batchCount">0 rows</span></div>
+        <div class="card-body">
+          <p class="section-note">Upload CSV, XLS or XLSX. Use <strong>Latitude</strong> and <strong>Longitude</strong> columns for fastest results. An <strong>Address</strong> or <strong>Location</strong> column is supported for small, one-time batches (up to 50 address-only rows) under the <a href="https://operations.osmfoundation.org/policies/nominatim/" target="_blank" rel="noopener">Nominatim usage policy</a>.</p>
+          <label class="upload-zone" id="uploadZone" for="batchFile">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
+            <div class="upload-title">Choose or drop a spreadsheet</div>
+            <div class="upload-help">Maximum 1,000 rows · first worksheet will be used</div>
+            <input id="batchFile" type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          </label>
+          <div class="progress" id="batchProgress"><span></span></div>
+          <div class="batch-summary" id="batchSummary"></div>
+          <div class="batch-actions">
+            <button class="btn btn-ghost" id="templateBtn">Download Template</button>
+            <button class="btn btn-primary" id="exportBatchBtn" disabled>Export Excel</button>
+            <button class="btn btn-ghost" id="clearBatchBtn" disabled>Clear</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="map-wrap">
+      <div class="map-panel-header">
+        <div><span class="map-eyebrow">Map workspace</span><h2>Administrative boundaries</h2></div>
+        <span class="map-tip"><strong>Tip:</strong> Right-click anywhere to inspect</span>
+      </div>
       <div id="map"></div>
       <div id="loadingOverlay">
         <div class="spinner"></div>
@@ -273,6 +431,9 @@
 
 <script>
 /* Load Leaflet → Turf in order, then boot */
+var initialTheme = localStorage.getItem('mbf-theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+document.documentElement.setAttribute('data-theme', initialTheme);
+
 function loadScript(src) {
   return new Promise(function(resolve, reject) {
     var s = document.createElement('script');
@@ -285,6 +446,7 @@ function loadScript(src) {
 
 loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
   .then(function() { return loadScript('https://unpkg.com/@turf/turf@6/turf.min.js'); })
+  .then(function() { return loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js').catch(function() { window._xlsxUnavailable = true; }); })
   .then(boot)
   .catch(function(err) {
     document.getElementById('loadingText').textContent = 'Failed to load map libraries';
@@ -295,20 +457,31 @@ function boot() {
 
   /* ── Tile definitions ── */
   var TILES = {
-    dark: {url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',  subdomains: 'abcd',  maxZoom: 20,  attribution: '&copy; OpenStreetMap &copy; CARTO'},
+    dark: {url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',  subdomains: 'abcd', maxZoom:20, attr:'&copy; OpenStreetMap &copy; CARTO'},
+    light:{url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', subdomains:'abcd', maxZoom:20, attr:'&copy; OpenStreetMap &copy; CARTO'},
     osm:  { url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',              attr:'&copy; OpenStreetMap contributors' },
     topo: { url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                attr:'&copy; OSM &copy; OpenTopoMap' }
   };
-  var tileKeys = ['dark','osm','topo'];
-  var tileIdx  = 0;
+  var tileKeys = ['dark','light','osm','topo'];
+  var tileIdx  = initialTheme === 'light' ? 1 : 0;
   var tileLayers = {};
   Object.keys(TILES).forEach(function(k) {
-    tileLayers[k] = L.tileLayer(TILES[k].url, { attribution: TILES[k].attr, maxZoom: 19 });
+    tileLayers[k] = L.tileLayer(TILES[k].url, { attribution: TILES[k].attr, maxZoom: TILES[k].maxZoom || 19, subdomains:TILES[k].subdomains || 'abc' });
   });
 
   /* ── Map ── */
   var map = L.map('map').setView([4.2105, 108.9758], 6);
-  tileLayers.dark.addTo(map);
+  tileLayers[tileKeys[tileIdx]].addTo(map);
+
+  /* Keep Leaflet in sync when the sidebar changes the grid height. */
+  if ('ResizeObserver' in window) {
+    var mapResizeFrame = null;
+    var mapResizeObserver = new ResizeObserver(function() {
+      cancelAnimationFrame(mapResizeFrame);
+      mapResizeFrame = requestAnimationFrame(function() { map.invalidateSize({ pan:false }); });
+    });
+    mapResizeObserver.observe(document.getElementById('map'));
+  }
 
   /* ── Geodata ── */
   var GEO_URLS = {
@@ -325,7 +498,15 @@ function boot() {
   var layerOn     = { district:true, parliament:true, dun:true };
   var userMarker  = null;
   var ctxLatLng   = null;
-  var history     = [];
+  var history     = loadHistory();
+  var batchLayer  = L.featureGroup().addTo(map);
+  var batchResults = [];
+  var lastNominatimAt = 0;
+  var nominatimQueue = Promise.resolve();
+  var geocodeCache = loadGeocodeCache();
+
+  updateThemeButton();
+  renderHistory();
 
   setStatus('Loading boundary data…');
 
@@ -370,7 +551,7 @@ function boot() {
       lat = parseFloat(parts[0]); lon = parseFloat(parts[1]); label = null;
       runLookup(lat, lon, label);
     } else {
-      fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q) + '&countrycodes=my&limit=1')
+      rateLimitedNominatim('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q) + '&countrycodes=my&limit=1')
         .then(function(r) { return r.json(); })
         .then(function(d) {
           if (!d.length) { toast('Location not found'); setStatus('Not found'); return; }
@@ -392,6 +573,28 @@ function boot() {
     );
   });
 
+  /* ── Light / dark theme (including basemap) ── */
+  document.getElementById('themeBtn').addEventListener('click', function() {
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('mbf-theme', next);
+    switchTile(next);
+    updateThemeButton();
+    toast(next === 'dark' ? 'Dark mode enabled' : 'Light mode enabled');
+  });
+
+  function updateThemeButton() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    document.getElementById('themeIcon').textContent = dark ? '☀️' : '🌙';
+    document.getElementById('themeLabel').textContent = dark ? 'Light mode' : 'Dark mode';
+  }
+
+  function switchTile(key) {
+    map.removeLayer(tileLayers[tileKeys[tileIdx]]);
+    tileIdx = tileKeys.indexOf(key);
+    tileLayers[key].addTo(map);
+  }
+
   /* ── Map style ── */
   document.getElementById('mapStyleBtn').addEventListener('click', function() {
     map.removeLayer(tileLayers[tileKeys[tileIdx]]);
@@ -407,6 +610,7 @@ function boot() {
     if (!document.fullscreenElement) el.requestFullscreen && el.requestFullscreen();
     else document.exitFullscreen && document.exitFullscreen();
   });
+  document.addEventListener('fullscreenchange', function() { setTimeout(function() { map.invalidateSize(); }, 120); });
 
   /* ── Layer toggles ── */
   document.querySelectorAll('.layer-toggle').forEach(function(el) {
@@ -429,8 +633,9 @@ function boot() {
     document.getElementById('clearResultBtn').style.display = 'none';
   });
   document.getElementById('clearHistoryBtn').addEventListener('click', function() {
-    history = []; renderHistory(); toast('History cleared');
+    history = []; saveHistory(); renderHistory(); toast('History cleared');
   });
+  document.getElementById('exportHistoryBtn').addEventListener('click', exportHistoryCsv);
 
   /* ── Context menu ── */
   var ctxMenu = document.getElementById('context-menu');
@@ -453,6 +658,7 @@ function boot() {
 
   /* ── Core lookup ── */
   function runLookup(lat, lon, label) {
+    if (!validCoordinate(lat, lon)) { toast('Enter valid latitude and longitude'); setStatus('Invalid coordinates'); return; }
     dataReady.then(function() {
       showSkeleton();
       clearLayers();
@@ -479,7 +685,7 @@ function boot() {
             var lm = L.marker([c[1], c[0]], {
               icon: L.divIcon({
                 className: '',
-                html: '<div style="font-family:\'DM Sans\',sans-serif;font-size:11px;font-weight:600;color:' + COLORS[key] + ';background:rgba(13,17,23,.92);border:1px solid ' + COLORS[key] + '40;padding:3px 9px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4)">' + key.charAt(0).toUpperCase() + key.slice(1) + ': ' + res[key] + '</div>',
+                html: '<div class="boundary-label" style="color:' + COLORS[key] + ';border:1px solid ' + COLORS[key] + '55">' + key.charAt(0).toUpperCase() + key.slice(1) + ': ' + escHtml(res[key]) + '</div>',
                 iconAnchor: [0, 0]
               })
             });
@@ -510,7 +716,7 @@ function boot() {
       if (label) {
         afterLabel(label);
       } else {
-        fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon)
+        rateLimitedNominatim('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon)
           .then(function(r) { return r.json(); })
           .then(function(d) { afterLabel(d.display_name || (lat.toFixed(5) + ', ' + lon.toFixed(5))); })
           .catch(function()  { afterLabel(lat.toFixed(5) + ', ' + lon.toFixed(5)); });
@@ -521,12 +727,12 @@ function boot() {
   function buildPopup(label, lat, lon, res) {
     var r = function(lbl, val, col) {
       return val
-        ? '<div style="font-size:12px;margin:4px 0"><span style="color:' + col + ';font-weight:600">' + lbl + ' </span><span style="color:#e6edf3">' + val + '</span></div>'
+        ? '<div style="font-size:12px;margin:4px 0"><span style="color:' + col + ';font-weight:600">' + lbl + ' </span><span style="color:var(--popup-text)">' + escHtml(val) + '</span></div>'
         : '<div style="font-size:12px;color:#7d8590;margin:4px 0">' + lbl + ' <em>not found</em></div>';
     };
     var short = label.split(',').slice(0,3).join(',');
-    return '<div style="font-family:\'DM Sans\',sans-serif">'
-      + '<div style="font-size:13px;font-weight:500;color:#e6edf3;margin-bottom:10px;line-height:1.4">' + short + '</div>'
+    return '<div style="font-family:\'Inter\',sans-serif">'
+      + '<div style="font-size:13px;font-weight:500;color:var(--popup-text);margin-bottom:10px;line-height:1.4">' + escHtml(short) + '</div>'
       + r('District',   res.district,   '#f97316')
       + r('Parliament', res.parliament, '#38bdf8')
       + r('DUN',        res.dun,        '#4ade80')
@@ -553,7 +759,7 @@ function boot() {
     ];
     var rows = items.map(function(it) {
       var copyBtn = res[it.k] ? '<button class="copy-btn" data-copy="' + esc(res[it.k]) + '" title="Copy"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '';
-      var valHtml = res[it.k] ? '<span class="result-value">' + res[it.k] + '</span>' : '<span class="not-found-badge">Not found</span>';
+      var valHtml = res[it.k] ? '<span class="result-value">' + escHtml(res[it.k]) + '</span>' : '<span class="not-found-badge">Not found</span>';
       return '<div class="result-item"><span class="result-dot" style="background:' + it.c + '"></span><div><span class="result-label">' + it.lb + '</span>' + valHtml + '</div>' + copyBtn + '</div>';
     }).join('');
 
@@ -562,7 +768,7 @@ function boot() {
 
     document.getElementById('resultsPanel').innerHTML =
       '<div class="fade-in">' +
-      '<p class="result-location">' + short + '</p>' +
+      '<p class="result-location">' + escHtml(short) + '</p>' +
       '<p class="result-coords">' + lat.toFixed(6) + ', ' + lon.toFixed(6) + '</p>' +
       '<div class="result-items">' + rows + '</div>' +
       '<div class="result-actions">' +
@@ -582,17 +788,18 @@ function boot() {
 
   function addHistory(lat, lon, label, res) {
     history.unshift({ lat:lat, lon:lon, label:label, short:label.split(',')[0], res:res });
-    if (history.length > 8) history.pop();
+    if (history.length > 20) history.length = 20;
+    saveHistory();
     renderHistory();
   }
 
   function renderHistory() {
     var list = document.getElementById('historyList');
     if (!history.length) { list.innerHTML = '<p class="history-empty">No recent searches yet.</p>'; return; }
-    list.innerHTML = history.map(function(h, i) {
+    list.innerHTML = history.slice(0,8).map(function(h, i) {
       return '<div class="history-item" data-idx="' + i + '">' +
         '<div class="history-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>' +
-        '<div style="flex:1;min-width:0"><div class="history-name">' + h.short + '</div><div class="history-sub">' + (h.res.district||'—') + ' · ' + (h.res.parliament||'—') + '</div></div>' +
+        '<div style="flex:1;min-width:0"><div class="history-name">' + escHtml(h.short) + '</div><div class="history-sub">' + escHtml(h.res.district||'—') + ' · ' + escHtml(h.res.parliament||'—') + '</div></div>' +
         '<div style="font-size:10px;color:var(--muted)">#' + (i+1) + '</div></div>';
     }).join('');
     list.querySelectorAll('.history-item').forEach(function(el) {
@@ -601,6 +808,264 @@ function boot() {
         runLookup(h.lat, h.lon, h.label);
       });
     });
+  }
+
+  function loadHistory() {
+    try { var saved = JSON.parse(localStorage.getItem('mbf-history') || '[]'); return Array.isArray(saved) ? saved : []; }
+    catch (e) { return []; }
+  }
+
+  function saveHistory() {
+    try { localStorage.setItem('mbf-history', JSON.stringify(history)); } catch (e) {}
+  }
+
+  function exportHistoryCsv() {
+    if (!history.length) { toast('No recent searches to export'); return; }
+    var rows = [['No','Location','Latitude','Longitude','District','Parliament','DUN']];
+    history.forEach(function(h, i) {
+      rows.push([i+1,h.label,h.lat,h.lon,h.res.district||'',h.res.parliament||'',h.res.dun||'']);
+    });
+    var csv = '\uFEFF' + rows.map(function(row) { return row.map(csvCell).join(','); }).join('\r\n');
+    downloadBlob(new Blob([csv], {type:'text/csv;charset=utf-8'}), 'Malaysia_Boundary_Recent_Searches.csv');
+    toast('Recent searches exported');
+  }
+
+  /* ── Batch CSV / Excel lookup ── */
+  var uploadZone = document.getElementById('uploadZone');
+  var batchFile = document.getElementById('batchFile');
+  batchFile.addEventListener('change', function() { if (batchFile.files[0]) processBatchFile(batchFile.files[0]); });
+  ['dragenter','dragover'].forEach(function(name) {
+    uploadZone.addEventListener(name, function(e) { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  });
+  ['dragleave','drop'].forEach(function(name) {
+    uploadZone.addEventListener(name, function(e) { e.preventDefault(); uploadZone.classList.remove('dragover'); });
+  });
+  uploadZone.addEventListener('drop', function(e) {
+    var file = e.dataTransfer.files[0];
+    if (file) processBatchFile(file);
+  });
+  document.getElementById('templateBtn').addEventListener('click', downloadTemplate);
+  document.getElementById('exportBatchBtn').addEventListener('click', exportBatchExcel);
+  document.getElementById('clearBatchBtn').addEventListener('click', clearBatch);
+
+  async function processBatchFile(file) {
+    if (!/\.(csv|xls|xlsx)$/i.test(file.name)) { toast('Please choose a CSV, XLS or XLSX file'); return; }
+    try {
+      setBatchBusy(true);
+      setStatus('Reading ' + file.name + '…');
+      if (typeof XLSX === 'undefined') throw new Error('Spreadsheet library could not be loaded. Check your internet connection and refresh.');
+      await dataReady;
+      var bytes = await file.arrayBuffer();
+      var workbook = XLSX.read(bytes, {type:'array', cellDates:true});
+      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      if (!rows.length) throw new Error('The first worksheet is empty.');
+      if (rows.length > 1000) throw new Error('The file has ' + rows.length + ' rows. The maximum is 1,000.');
+
+      var columns = detectBatchColumns(rows[0]);
+      if ((!columns.lat || !columns.lon) && !columns.address) {
+        throw new Error('Add Latitude and Longitude columns, or an Address/Location column.');
+      }
+      var addressOnlyCount = rows.filter(function(row) {
+        var la = columns.lat ? parseFloat(row[columns.lat]) : NaN;
+        var lo = columns.lon ? parseFloat(row[columns.lon]) : NaN;
+        return !validCoordinate(la, lo) && columns.address && String(row[columns.address] || '').trim();
+      }).length;
+      if (addressOnlyCount > 50) throw new Error('Address-only processing is limited to 50 rows. Add Latitude and Longitude for larger files.');
+
+      batchResults = [];
+      batchLayer.clearLayers();
+      for (var i = 0; i < rows.length; i++) {
+        var source = rows[i];
+        var lat = columns.lat ? parseFloat(source[columns.lat]) : NaN;
+        var lon = columns.lon ? parseFloat(source[columns.lon]) : NaN;
+        var address = columns.address ? String(source[columns.address] || '').trim() : '';
+        var status = 'Completed';
+        var message = '';
+
+        if (!validCoordinate(lat, lon) && address) {
+          var found = await geocodeAddress(address);
+          if (found) { lat = found.lat; lon = found.lon; }
+          else { status = 'Not found'; message = 'Address could not be geocoded'; }
+        } else if (!validCoordinate(lat, lon)) {
+          status = 'Invalid'; message = 'Missing or invalid coordinates';
+        }
+
+        var boundary = {district:null, parliament:null, dun:null};
+        if (status === 'Completed') {
+          boundary = lookupBoundaryData(lat, lon);
+          if (!boundary.district && !boundary.parliament && !boundary.dun) {
+            status = 'Outside coverage'; message = 'No Malaysian boundary matched';
+          }
+        }
+
+        var output = Object.assign({}, source, {
+          'Result Latitude': validCoordinate(lat, lon) ? Number(lat.toFixed(6)) : '',
+          'Result Longitude': validCoordinate(lat, lon) ? Number(lon.toFixed(6)) : '',
+          'District': boundary.district || '',
+          'Parliament': boundary.parliament || '',
+          'DUN': boundary.dun || '',
+          'Processing Status': status,
+          'Processing Message': message
+        });
+        batchResults.push(output);
+
+        if (validCoordinate(lat, lon)) addBatchMarker(lat, lon, address || ('Row ' + (i + 2)), boundary, status);
+        setBatchProgress(i + 1, rows.length);
+      }
+
+      if (batchLayer.getLayers().length) map.fitBounds(batchLayer.getBounds().pad(.16), {maxZoom:13});
+      var ok = batchResults.filter(function(r) { return r['Processing Status'] === 'Completed'; }).length;
+      var failed = batchResults.length - ok;
+      document.getElementById('batchSummary').innerHTML = '<strong>' + file.name + '</strong><br>' + ok + ' completed · ' + failed + ' need attention · ' + batchResults.length + ' total';
+      document.getElementById('batchSummary').style.display = 'block';
+      document.getElementById('batchCount').textContent = batchResults.length + ' rows';
+      document.getElementById('exportBatchBtn').disabled = false;
+      document.getElementById('clearBatchBtn').disabled = false;
+      setStatus('Batch complete — ' + ok + ' of ' + batchResults.length + ' matched');
+      toast('Batch lookup completed');
+    } catch (err) {
+      batchResults = [];
+      document.getElementById('batchSummary').innerHTML = '<strong>Unable to process file</strong><br>' + escHtml(err.message || String(err));
+      document.getElementById('batchSummary').style.display = 'block';
+      setStatus('Batch processing failed');
+      toast('Could not process spreadsheet');
+    } finally {
+      setBatchBusy(false);
+      batchFile.value = '';
+    }
+  }
+
+  function detectBatchColumns(row) {
+    var keys = Object.keys(row);
+    var normalized = {};
+    keys.forEach(function(k) { normalized[normalizeHeader(k)] = k; });
+    function pick(names) {
+      for (var i = 0; i < names.length; i++) if (normalized[names[i]]) return normalized[names[i]];
+      return null;
+    }
+    return {
+      lat: pick(['latitude','lat','y','candidatelat']),
+      lon: pick(['longitude','lon','lng','long','x','candidatelong']),
+      address: pick(['address','location','place','alamat','sitename','name'])
+    };
+  }
+
+  function normalizeHeader(value) { return String(value).toLowerCase().replace(/[^a-z0-9]/g,''); }
+  function validCoordinate(lat, lon) { return isFinite(lat) && isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180; }
+
+  async function geocodeAddress(address) {
+    var key = String(address).trim().toLowerCase();
+    if (geocodeCache[key]) return geocodeCache[key];
+    try {
+      var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=my&limit=1&q=' + encodeURIComponent(address);
+      var response = await rateLimitedNominatim(url);
+      if (!response.ok) return null;
+      var data = await response.json();
+      var result = data.length ? {lat:parseFloat(data[0].lat), lon:parseFloat(data[0].lon)} : null;
+      if (result) {
+        geocodeCache[key] = result;
+        var keys = Object.keys(geocodeCache);
+        if (keys.length > 500) delete geocodeCache[keys[0]];
+        try { localStorage.setItem('mbf-geocode-cache', JSON.stringify(geocodeCache)); } catch (e) {}
+      }
+      return result;
+    } catch (e) { return null; }
+  }
+
+  function loadGeocodeCache() {
+    try { return JSON.parse(localStorage.getItem('mbf-geocode-cache') || '{}'); }
+    catch (e) { return {}; }
+  }
+
+  function rateLimitedNominatim(url) {
+    var job = nominatimQueue.then(async function() {
+      var remaining = 1100 - (Date.now() - lastNominatimAt);
+      if (remaining > 0) await wait(remaining);
+      var response = await fetch(url, {headers:{'Accept':'application/json'}});
+      lastNominatimAt = Date.now();
+      return response;
+    });
+    nominatimQueue = job.catch(function() {});
+    return job;
+  }
+
+  function lookupBoundaryData(lat, lon) {
+    var pt = turf.point([lon, lat]);
+    var result = {};
+    Object.keys(geoData).forEach(function(key) {
+      var features = geoData[key].features;
+      result[key] = null;
+      for (var i = 0; i < features.length; i++) {
+        if (turf.booleanPointInPolygon(pt, features[i])) {
+          result[key] = features[i].properties && features[i].properties[FIELD[key]] ? features[i].properties[FIELD[key]] : null;
+          break;
+        }
+      }
+    });
+    return result;
+  }
+
+  function addBatchMarker(lat, lon, label, boundary, status) {
+    var marker = L.marker([lat, lon], {icon:L.divIcon({className:'',html:'<div class="batch-marker"></div>',iconAnchor:[7,7]})});
+    marker.bindPopup('<div style="font-family:Inter,sans-serif"><strong>' + escHtml(label) + '</strong><br><span style="color:var(--muted)">' +
+      escHtml(status) + '</span><hr style="border:0;border-top:1px solid var(--border);margin:8px 0">District: ' + escHtml(boundary.district || '—') +
+      '<br>Parliament: ' + escHtml(boundary.parliament || '—') + '<br>DUN: ' + escHtml(boundary.dun || '—') + '</div>');
+    marker.addTo(batchLayer);
+  }
+
+  function setBatchProgress(done, total) {
+    var progress = document.getElementById('batchProgress');
+    progress.style.display = 'block';
+    progress.firstElementChild.style.width = Math.round(done / total * 100) + '%';
+    document.getElementById('batchCount').textContent = done + ' / ' + total;
+  }
+
+  function setBatchBusy(busy) {
+    document.getElementById('batchFile').disabled = busy;
+    document.getElementById('templateBtn').disabled = busy;
+    document.getElementById('searchBtn').disabled = busy;
+    document.getElementById('searchInput').disabled = busy;
+    document.getElementById('locateBtn').disabled = busy;
+    if (busy) {
+      document.getElementById('batchSummary').style.display = 'none';
+      document.getElementById('batchProgress').style.display = 'block';
+      document.getElementById('batchProgress').firstElementChild.style.width = '0%';
+      document.getElementById('exportBatchBtn').disabled = true;
+    }
+  }
+
+  function downloadTemplate() {
+    if (typeof XLSX === 'undefined') { toast('Spreadsheet tools are unavailable'); return; }
+    var sample = [{Location:'Menara Kuala Lumpur',Latitude:3.1528,Longitude:101.7037},{Location:'Johor Bahru City Square',Latitude:'',Longitude:''}];
+    var ws = XLSX.utils.json_to_sheet(sample);
+    ws['!cols'] = [{wch:28},{wch:14},{wch:14}];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Locations');
+    XLSX.writeFile(wb, 'Malaysia_Boundary_Batch_Template.xlsx');
+  }
+
+  function exportBatchExcel() {
+    if (!batchResults.length) { toast('No batch results to export'); return; }
+    if (typeof XLSX === 'undefined') { toast('Spreadsheet tools are unavailable'); return; }
+    var ws = XLSX.utils.json_to_sheet(batchResults);
+    ws['!autofilter'] = {ref:ws['!ref']};
+    ws['!cols'] = Object.keys(batchResults[0]).map(function(key) { return {wch:Math.min(36, Math.max(12, key.length + 2))}; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Boundary Results');
+    XLSX.writeFile(wb, 'Malaysia_Boundary_Batch_Results.xlsx');
+    toast('Excel results exported');
+  }
+
+  function clearBatch() {
+    batchResults = [];
+    batchLayer.clearLayers();
+    document.getElementById('batchSummary').style.display = 'none';
+    document.getElementById('batchProgress').style.display = 'none';
+    document.getElementById('batchCount').textContent = '0 rows';
+    document.getElementById('exportBatchBtn').disabled = true;
+    document.getElementById('clearBatchBtn').disabled = true;
+    toast('Batch results cleared');
   }
 
   /* ── Helpers ── */
@@ -627,6 +1092,24 @@ function boot() {
   function esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
+
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function csvCell(value) {
+    var s = String(value == null ? '' : value);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+
+  function downloadBlob(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function wait(ms) { return new Promise(function(resolve) { setTimeout(resolve, ms); }); }
 }
 </script>
 </body>
