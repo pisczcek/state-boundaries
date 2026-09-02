@@ -163,6 +163,9 @@
     .fade-in{animation:fadeIn .35s ease}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     .leaflet-popup-content-wrapper{background:var(--popup-bg)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 32px rgba(0,0,0,.3)!important;color:var(--popup-text)!important}
+    /* Dark mode is generated from the standard OpenStreetMap tiles locally.
+       This avoids depending on a separate dark-map service or API key. */
+    .dark-basemap{filter:invert(1) hue-rotate(180deg) brightness(.82) contrast(.9) saturate(.72)}
     .leaflet-popup-tip{background:var(--popup-bg)!important}
     .leaflet-popup-content{margin:14px 16px!important}
     .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border)!important}
@@ -458,21 +461,58 @@ function boot() {
 
   /* ── Tile definitions ── */
   var TILES = {
-    dark: {url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',  subdomains: 'abcd', maxZoom:20, attr:'&copy; OpenStreetMap &copy; CARTO'},
-    light:{url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', subdomains:'abcd', maxZoom:20, attr:'&copy; OpenStreetMap &copy; CARTO'},
-    osm:  { url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',              attr:'&copy; OpenStreetMap contributors' },
-    topo: { url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                attr:'&copy; OSM &copy; OpenTopoMap' }
+    dark: {
+      url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      maxZoom:19,
+      className:'dark-basemap',
+      attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    },
+    light:{
+      url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      maxZoom:19,
+      attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    },
+    osm:{
+      url:'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+      subdomains:'abc',
+      maxZoom:19,
+      attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, Tiles style by Humanitarian OpenStreetMap Team'
+    },
+    topo:{
+      url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+      subdomains:'abc',
+      maxZoom:17,
+      attr:'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, SRTM | Map style &copy; OpenTopoMap'
+    }
   };
   var tileKeys = ['dark','light','osm','topo'];
   var tileIdx  = initialTheme === 'light' ? 1 : 0;
   var tileLayers = {};
   Object.keys(TILES).forEach(function(k) {
-    tileLayers[k] = L.tileLayer(TILES[k].url, { attribution: TILES[k].attr, maxZoom: TILES[k].maxZoom || 19, subdomains:TILES[k].subdomains || 'abc' });
+    tileLayers[k] = L.tileLayer(TILES[k].url, {
+      attribution:TILES[k].attr,
+      maxZoom:TILES[k].maxZoom || 19,
+      subdomains:TILES[k].subdomains || 'abc',
+      className:TILES[k].className || '',
+      detectRetina:false
+    });
   });
 
   /* ── Map ── */
   var map = L.map('map').setView([4.2105, 108.9758], 6);
   tileLayers[tileKeys[tileIdx]].addTo(map);
+
+  /* Optional styles fall back to standard OSM after repeated tile failures. */
+  Object.keys(tileLayers).forEach(function(key) {
+    var failures = 0;
+    tileLayers[key].on('tileerror', function() {
+      failures += 1;
+      if (failures === 4 && map.hasLayer(tileLayers[key]) && key !== 'light' && key !== 'dark') {
+        switchTile(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+        toast('Map style unavailable — switched to OpenStreetMap');
+      }
+    });
+  });
 
   /* Keep Leaflet in sync when the sidebar changes the grid height. */
   if ('ResizeObserver' in window) {
